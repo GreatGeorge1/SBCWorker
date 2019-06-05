@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <UserSecretsId>dotnet-Worker-B6BE2360-C43F-4EF0-A516-FFA3CD3963EB</UserSecretsId>
+    <ApplicationIcon />
+    <OutputType>Exe</OutputType>
+    <StartupObject />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Iot.Device.Bindings" Version="0.1.0-prerelease.19171.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="2.2.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="2.2.4" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="3.0.0-preview5.19227.9" />
+    <PackageReference Include="System.Device.Gpio" Version="0.1.0-prerelease.19251.2" />
+    <PackageReference Include="System.IO.Ports" Version="4.6.0-preview5.19224.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Worker.Core\Worker.Core.csproj" />
+    <ProjectReference Include="..\Worker.EntityFrameworkCore\Worker.EntityFrameworkCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="controllerdb.db">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>
