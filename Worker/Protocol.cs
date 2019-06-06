@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
 
@@ -38,7 +39,9 @@ namespace Worker.Host
         [Display(Name = "TERMINAL_RESET")]
         TerminalReset,
         [Display(Name = "START")]
-        Start
+        Start,
+        [Display(Name = "NOTSET")]
+        NotSet//fix
     }
 
     public enum ProtocolResponse
@@ -68,7 +71,9 @@ namespace Worker.Host
         [Display(Name = "TERMINAL_OK")]
         TerminalOk,
         [Display(Name = "TERMINAL_FAIL")]
-        TerminalFail
+        TerminalFail,
+        [Display(Name = "NOTSET")]
+        NotSet
     }
 
     public enum ProtocolErrors
@@ -90,7 +95,7 @@ namespace Worker.Host
     public class ProtocolMethod
     {
         public ProtocolCommands CommandHeader { get; set; }
-        public List<ProtocolResponse> ResponseHeaders { get; set; }
+        public virtual List<ProtocolResponse> ResponseHeaders { get; set; }
         public bool HasResponseHeader { get; set; }
         public bool HasResponseValue { get; set; }
         public bool HasCommandValue { get; set; }
@@ -98,12 +103,63 @@ namespace Worker.Host
         public bool IsControllerHosted { get; set; }
     }
 
-    public class ExecutedMethod
+    public class ExecutedMethod:INotifyPropertyChanged
     {
         public ProtocolMethod MethodInfo { get; set; }
-        public string CommandValue { get; set; }
-        public string ResponseValue { get; set; }
-        public string Hash { get; set; }
+        private string commandValue;
+        public string CommandValue
+        {
+            get {return commandValue; }
+            set {
+                commandValue = value;
+                OnPropertyChanged("CommandValue");}
+        }
+        private ProtocolResponse responseHeader;
+        public ProtocolResponse ResponseHeader
+        {
+            get { return responseHeader; }
+            set {
+                responseHeader = value;
+                OnPropertyChanged("ResponseHeader");}
+        }
+        private string responseValue;
+        public string ResponseValue
+        {
+            get { return this.responseValue; }
+            set {
+                responseValue = value;
+                OnPropertyChanged("ResponseValue");}
+        }
+        private string hash;
+        public string Hash
+        {
+            get { return hash; }
+            set {
+                hash = value;
+                OnPropertyChanged("Hash"); }
+        }
+        private bool isFired;
+        public bool IsFired
+        {
+            get { return isFired; }
+            set { isFired = value; OnPropertyChanged("IsFired"); }
+        }
+        private bool isCompleted;
+        public bool IsCompleted
+        {
+            get { return isCompleted; }
+            set { isCompleted = value; OnPropertyChanged("IsCompleted"); }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged(string name)
+        {
+            PropertyChangedEventHandler handler = PropertyChanged;
+            if (handler != null)
+            {
+                handler(this, new PropertyChangedEventArgs(name));
+            }
+        }
     }
 
     public class Protocol
@@ -232,17 +288,30 @@ namespace Worker.Host
                 IsControllerHosted=false,
                 IsHashable=false} }
         };
-        public static ProtocolCommands GetCommand(string command)
+        public static ProtocolCommands GetCommandHeader(string command)
         {
             var enums = (ProtocolCommands[])Enum.GetValues(typeof(ProtocolCommands));
             foreach (var com in enums)
             {
-                if (command.Trim().Equals(com.GetDisplayName()))
+                if (command.Equals(com.GetDisplayName()))
                 {
                     return com;
                 }
             }
-            throw new CommandNotFoundException($"command :{command} not found");
+            throw new CommandHeaderNotFoundException($"command :{command} not found");
+        }
+
+        public static ProtocolResponse GetResponseHeader(string response)
+        {
+            var enums = (ProtocolResponse[])Enum.GetValues(typeof(ProtocolResponse));
+            foreach (var com in enums)
+            {
+                if (response.Equals(com.GetDisplayName()))
+                {
+                    return com;
+                }
+            }
+            throw new ResponseHeaderNotFoundException($"response :{response} not found");
         }
 
         public static string CreateQuery(ProtocolCommands command, string value)
@@ -255,11 +324,70 @@ namespace Worker.Host
         {
             return $"{command.GetDisplayName()}\r\n";
         }
+
+        public static string CreateResponse(ProtocolResponse command)
+        {
+            return $"{command.GetDisplayName()}\r\n";
+        }
+
+
+        public static bool CheckReadyTerminalHosted(ExecutedMethod executedMethod)
+        {
+            bool ready = true;
+            if (!executedMethod.MethodInfo.IsControllerHosted)
+            {
+                if(executedMethod.MethodInfo.HasCommandValue)
+                {
+                    if (string.IsNullOrWhiteSpace(executedMethod.CommandValue))
+                    {
+                        ready = false;
+                    }
+                }
+                if (executedMethod.MethodInfo.IsHashable)
+                {
+                    if (string.IsNullOrWhiteSpace(executedMethod.Hash))
+                    {
+                        ready = false;
+                    }
+                }
+            }
+            return ready;
+        }
+
+        public static bool CheckReadyControllerHosted(ExecutedMethod executedMethod)
+        {
+            bool ready = true;
+            if (executedMethod.MethodInfo.IsControllerHosted)
+            {
+                if (executedMethod.MethodInfo.HasResponseHeader)
+                {
+                    if (executedMethod.ResponseHeader == ProtocolResponse.NotSet)
+                    {
+                        ready = false;
+                    }
+                }
+                if (executedMethod.MethodInfo.HasResponseValue)
+                {
+                    if (string.IsNullOrWhiteSpace(executedMethod.ResponseValue))
+                    {
+                        ready = false;
+                    }
+                }
+            }
+            return ready;
+        }
     }
 
-    public class CommandNotFoundException : Exception
+    public class CommandHeaderNotFoundException : Exception
     {
-        public CommandNotFoundException(string message) : base(message)
+        public CommandHeaderNotFoundException(string message) : base(message)
+        {
+        }
+    }
+
+    public class ResponseHeaderNotFoundException : Exception
+    {
+        public ResponseHeaderNotFoundException(string message): base(message)
         {
         }
     }
