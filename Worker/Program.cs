@@ -58,9 +58,11 @@ namespace Worker.Host
                 });
                 services.AddSingleton<ListenerFactory>();
                 services.Configure<WorkerOptions>(config);
-                foreach (var port in config.GetSection("PortNames").AsEnumerable())
+                var options = new WorkerOptions();
+                config.GetSection("ListenerOptions").Bind(options);
+                foreach (var port in options.Ports)
                 {
-                    services.AddSingleton(new ListenerPort(port.Value));
+                    services.AddSingleton(new ListenerPort(port.PortName,port.IsRS485));
                 }
                 services.AddHostedService<ListenerHost>();
 

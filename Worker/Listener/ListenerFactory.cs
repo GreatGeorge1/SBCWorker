@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using Worker.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Worker.Models;
 
 namespace Worker.Host
 {
@@ -16,11 +17,11 @@ namespace Worker.Host
             _serviceProvider = serviceProvider;
             _serviceScopeFactory = serviceScopeFactory;
         }
-        public Listener NewListener(string portName)
+        public Listener NewListener(ListenerPort port)
         {
             var logger = _serviceProvider.GetService<ILogger<Listener>>();
             var context = _serviceProvider.GetService<ControllerDbContext>();
-            return new Listener(logger, portName, context);
+            return new Listener(logger, port, context);
         }
     }
 }

@@ -30,7 +30,7 @@ namespace Worker.Host
 
             foreach(var port in _ports)
             {
-                var listener = _factory.NewListener(port.Port);
+                var listener = _factory.NewListener(port);
                 await listener.ExecuteAsync(stoppingToken);
                 //await Listener.ListenPortAsync(port,_context, _logger, cancellationToken)
             }

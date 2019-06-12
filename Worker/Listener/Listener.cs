@@ -12,6 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Worker.EntityFrameworkCore;
+using Worker.Models;
 
 namespace Worker.Host
 {
@@ -19,75 +20,73 @@ namespace Worker.Host
     {
         private readonly ILogger logger;
         private readonly ControllerDbContext context;
-        private readonly string portName;
+        private readonly ListenerPort port;
         private SerialPort stream;
         private ExecutedMethod executedMethod { get; set; }
 
-        public Listener(ILogger logger, string portName,
+        public Listener(ILogger logger, ListenerPort port,
            ControllerDbContext dbcontext)
         {
             this.logger = logger;
-            this.portName = portName;
+            this.port = port;
             this.context = dbcontext;
         }
 
         public async Task ListenAsync(CancellationToken stoppingToken)
         {
-            if (!PortHelpers.PortNameExists(portName))
+            if (!PortHelpers.PortNameExists(port.PortName))
             {
-                throw new Exception($"{portName} not exists");
+                throw new Exception($"{port.PortName} not exists");
             }
-            stream = new SerialPort(portName);
+            stream = new SerialPort(port.PortName);
             stream.BaudRate = 115200;
             stream.ReadTimeout = 500;
             stream.WriteTimeout = 500;
-           // stream.Encoding = Encoding.UTF8;
-            stream.RtsEnable = true;
-            stream.DtrEnable = true;
-            // stream.Handshake = Handshake.RequestToSendXOnXOff;
             stream.DataReceived += DataReceivedAction;
             stream.ErrorReceived += ErrorReceivedAction;
             stream.PinChanged += PinChangedAction;
-          //  stream.NewLine = "\r\n";
-            // stream.NewLine = 0x30.ToString();
-            // stream.Handshake = Handshake.XOnXOff;
             stream.Parity = Parity.None;
             stream.StopBits = StopBits.One;
             stream.DataBits = 8;
-            //stream.DiscardNull = true;
-            stream.WriteBufferSize = 1024;
-         //  stream.Handshake = Handshak;
+
+            if (port.IsRS485)
+            {
+                stream.Handshake = Handshake.None;
+                stream.RtsEnable = true;
+                logger.LogInformation($"Port {port.PortName} in RS485 mode");
+            }
+        
             stream.Open();
             if (!stream.IsOpen)
             {
-                logger.LogCritical($"Error opening serial port {portName}");
-                throw new Exception($"Error opening serial port {portName}");
+                logger.LogCritical($"Error opening serial port {port.PortName}");
+                throw new Exception($"Error opening serial port {port.PortName}");
             }
-            logger.LogInformation($"Port {portName} open");
+            logger.LogInformation($"Port {port.PortName} open");
             if (stream == null)
             {
-                logger.LogCritical($"No serial port {portName}");
-                throw new Exception($"No serial port {portName}");
+                logger.LogCritical($"No serial port {port.PortName}");
+                throw new Exception($"No serial port {port.PortName}");
             }
             if (stream.CtsHolding)
             {
-                logger.LogInformation($"Cts detected {portName}");
+                logger.LogInformation($"Cts detected {port.PortName}");
             }
             else
             {
-                logger.LogInformation($"Cts NOT detected {portName}");
+                logger.LogInformation($"Cts NOT detected {port.PortName}");
             }
-            logger.LogInformation($"Port listener started: {portName}");
+            logger.LogInformation($"Port listener started: {port.PortName}");
         }
 
         private void PinChangedAction(object sender, SerialPinChangedEventArgs e)
         {
-            logger.LogInformation($"Port {portName} pin changed: {e.ToString()}");
+            logger.LogInformation($"Port {port.PortName} pin changed: {e.ToString()}");
         }
 
         private void ErrorReceivedAction(object sender, SerialErrorReceivedEventArgs e)
         {
-            logger.LogInformation($"Port {portName} erorr: {e.ToString()}");
+            logger.LogInformation($"Port {port.PortName} erorr: {e.ToString()}");
         }
 
         private async void DataReceivedAction(object sender, SerialDataReceivedEventArgs e)
@@ -95,6 +94,14 @@ namespace Worker.Host
             logger.LogInformation("DataReceived Action raised");
             var message = await ReadMessage();
             ProtocolCommands command=ProtocolCommands.NotSet;
+
+            if (message.Equals("COMPLETED"))
+            {
+                logger.LogWarning("COMPLETED");
+                executedMethod.IsCompleted = true;
+                return;
+            }
+
             try
             {
                 command = await ReadCommand(message);
@@ -154,6 +161,7 @@ namespace Worker.Host
                     else
                     {
                         logger.LogWarning($"Interrupted method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
+                     //   executedMethod.IsCompleted = true;//fix response
                         await ExecuteMethod(command);
                     }
                 }
@@ -206,17 +214,50 @@ namespace Worker.Host
                     var res = await VerifyCard(executedMethod.CommandValue, executedMethod.Hash);
                     if (res)
                     {
-                        var resposne = Protocol.CreateResponse(ProtocolResponse.CardOk);
-                        await WriteMessage(resposne);
+                        executedMethod.ResponseHeader = ProtocolResponse.CardOk;
+                        var response = executedMethod.CreateResponse();
+                        while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == ProtocolCommands.Card)
+                        {
+                            await WriteMessage(response);
+                            await Task.Delay(200);
+                        }
                     }
                     else
                     {
-                        var resposne = Protocol.CreateResponse(ProtocolResponse.CardError);
-                        await WriteMessage(resposne);
+                        executedMethod.ResponseHeader = ProtocolResponse.CardError;
+                        var response = executedMethod.CreateResponse();
+                        while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader==ProtocolCommands.Card)
+                        {
+                            await WriteMessage(response);
+                            await Task.Delay(200);
+                        }
                     }
-                    executedMethod.IsCompleted = true;
+                   // executedMethod.IsCompleted = true;
                     break;
-                case ProtocolCommands.Finger:break;
+                case ProtocolCommands.Finger:
+                    var finger = await VerifyFinger(executedMethod.CommandValue, executedMethod.Hash);
+                    if (finger)
+                    {
+                        executedMethod.ResponseHeader = ProtocolResponse.FingerOk;
+                        var response = executedMethod.CreateResponse();
+                        while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == ProtocolCommands.Finger)
+                        {
+                            await WriteMessage(response);
+                            await Task.Delay(200);
+                        }
+                    }
+                    else
+                    {
+                        executedMethod.ResponseHeader = ProtocolResponse.FingerError;
+                        var response = executedMethod.CreateResponse();
+                        while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == ProtocolCommands.Finger)
+                        {
+                            await WriteMessage(response);
+                            await Task.Delay(200);
+                        }
+                    }
+                    //executedMethod.IsCompleted = true;
+                    break;
                 //case ProtocolCommands.
             }
         }
@@ -251,7 +292,7 @@ namespace Worker.Host
                 logger.LogInformation($"Command is null {response}");
                 return ProtocolResponse.NotSet;
             }
-            logger.LogInformation($"Command is {response}");
+            logger.LogInformation($"Message is {response}");
 
             var res = Protocol.GetResponseHeader(response);
             return res;
@@ -264,7 +305,7 @@ namespace Worker.Host
                // logger.LogInformation($"port :{portName}, reading: {stream.ReadExisting()}");
                 string res = stream.ReadLine();
                 var snew = new string(res.Where(c => !char.IsControl(c)).ToArray());
-                logger.LogInformation($"port :{portName}, readed: {res}, filtered:{snew}");
+                logger.LogInformation($"port :{port.PortName}, readed: {res}, filtered:{snew}");
                 return snew;
             }
             catch (IOException ex)

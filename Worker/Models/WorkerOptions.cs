@@ -6,6 +6,12 @@ namespace Worker.Models
 {
     public class WorkerOptions
     {
-        public string[] PortNames { get; set; }
+        public ICollection<Port> Ports { get; set; }
+
+    }
+    public class Port
+    {
+        public string PortName { get; set; }
+        public bool IsRS485 { get; set; }
     }
 }

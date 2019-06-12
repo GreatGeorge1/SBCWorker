@@ -12,7 +12,7 @@ namespace Worker.Host
         Card=0,
         [Display(Name = "BLE")]
         Ble,
-        [Display(Name = "BLE")]
+        [Display(Name = "FINGER")]
         Finger,
         [Display(Name = "FINGER_TIMEOUT")]
         FingerTimeout,
@@ -159,6 +159,12 @@ namespace Worker.Host
             {
                 handler(this, new PropertyChangedEventArgs(name));
             }
+        }
+
+        public string CreateResponse()
+        {
+            var command = this.ResponseHeader;
+            return $"{command.GetDisplayName()}\r\n";
         }
     }
 
