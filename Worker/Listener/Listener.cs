@@ -23,6 +23,7 @@ namespace Worker.Host
         private readonly ListenerPort port;
         private SerialPort stream;
         private ExecutedMethod executedMethod { get; set; }
+        private CustomQueue<string> InputQueue { get; set; }
 
         public Listener(ILogger logger, ListenerPort port,
            ControllerDbContext dbcontext)
@@ -30,6 +31,110 @@ namespace Worker.Host
             this.logger = logger;
             this.port = port;
             this.context = dbcontext;
+            InputQueue = new CustomQueue<string>();
+            InputQueue.EnqueueEvent += EnqueueAction;
+        }
+
+        public async void EnqueueAction(object sender, CustomQueueEnqueueEventArgs<string> e)
+        {
+            string input;
+            bool dequeue = InputQueue.TryDequeue(out input);
+            if (dequeue)
+            {
+                if (!String.IsNullOrWhiteSpace(input))
+                {
+                    var message = input;
+                    ProtocolCommands command = ProtocolCommands.NotSet;
+
+                    if (message.Equals("COMPLETED"))
+                    {
+                        logger.LogWarning("COMPLETED");
+                        executedMethod.IsCompleted = true;
+                        return;
+                    }
+
+                    try
+                    {
+                        command = await ReadCommand(message);
+
+                    }
+                    catch (CommandHeaderNotFoundException ex)
+                    {
+                        logger.LogInformation(ex.Message);
+                    }
+
+                    if (command == ProtocolCommands.NotSet)
+                    {
+                        if (executedMethod != null)
+                        {
+                            if (!executedMethod.MethodInfo.IsControllerHosted)
+                            {
+                                if (executedMethod.MethodInfo.HasCommandValue && string.IsNullOrWhiteSpace(executedMethod.CommandValue))
+                                {
+                                    executedMethod.CommandValue = message;
+                                }
+                                else if (executedMethod.MethodInfo.IsHashable && string.IsNullOrWhiteSpace(executedMethod.Hash))
+                                {
+                                    executedMethod.Hash = message;
+                                }
+                            }
+                            else
+                            {
+                                if (executedMethod.MethodInfo.HasResponseHeader && executedMethod.ResponseHeader == ProtocolResponse.NotSet)
+                                {
+                                    try
+                                    {
+                                        var responseHeader = await ReadResponse(message);
+                                    }
+                                    catch (ResponseHeaderNotFoundException ex)
+                                    {
+
+                                        logger.LogWarning($"Flow warning, recieved message : {message}");
+                                        executedMethod = null;
+                                        logger.LogWarning("Executed method set to NULL");
+                                    }
+                                }
+                                else if (executedMethod.MethodInfo.HasResponseValue && string.IsNullOrWhiteSpace(executedMethod.ResponseValue))
+                                {
+                                    executedMethod.ResponseValue = message;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            logger.LogWarning($"Flow warning, recieved message : {message}");
+                        }
+                    }
+                    else
+                    {
+                        if (executedMethod != null)
+                        {
+                            if (executedMethod.IsCompleted)
+                            {
+                                await ExecuteMethod(command);
+                            }
+                            else
+                            {
+                                logger.LogWarning($"Interrupted method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
+                                //   executedMethod.IsCompleted = true;//fix response
+                                await ExecuteMethod(command);
+                            }
+                        }
+                        else
+                        {
+                            await ExecuteMethod(command);
+                        }
+                    }
+                }
+                else
+                {
+                    logger.LogWarning("EnqueueAction error");
+                }
+            }
+            else
+            {
+                logger.LogWarning("EnqueueAction error");
+            }
         }
 
         public async Task ListenAsync(CancellationToken stoppingToken)
@@ -92,84 +197,7 @@ namespace Worker.Host
         private async void DataReceivedAction(object sender, SerialDataReceivedEventArgs e)
         {
             logger.LogInformation("DataReceived Action raised");
-            var message = await ReadMessage();
-            ProtocolCommands command=ProtocolCommands.NotSet;
-
-            if (message.Equals("COMPLETED"))
-            {
-                logger.LogWarning("COMPLETED");
-                executedMethod.IsCompleted = true;
-                return;
-            }
-
-            try
-            {
-                command = await ReadCommand(message);
-
-            } catch(CommandHeaderNotFoundException ex)
-            {
-                logger.LogInformation(ex.Message);
-            }
-
-            if (command == ProtocolCommands.NotSet)
-            {
-                if (executedMethod != null)
-                {
-                    if (!executedMethod.MethodInfo.IsControllerHosted)
-                    {
-                        if (executedMethod.MethodInfo.HasCommandValue && string.IsNullOrWhiteSpace(executedMethod.CommandValue))
-                        {
-                            executedMethod.CommandValue = message;
-                        }else if(executedMethod.MethodInfo.IsHashable && string.IsNullOrWhiteSpace(executedMethod.Hash))
-                        {
-                            executedMethod.Hash = message;
-                        }
-                    }
-                    else
-                    {
-                        if(executedMethod.MethodInfo.HasResponseHeader && executedMethod.ResponseHeader == ProtocolResponse.NotSet)
-                        {
-                            try
-                            {
-                                var responseHeader = await ReadResponse(message);
-                            }catch(ResponseHeaderNotFoundException ex)
-                            {
-       
-                                logger.LogWarning($"Flow warning, recieved message : {message}");
-                                executedMethod = null;
-                                logger.LogWarning("Executed method set to NULL");
-                            }
-                        }else if(executedMethod.MethodInfo.HasResponseValue && string.IsNullOrWhiteSpace(executedMethod.ResponseValue))
-                        {
-                            executedMethod.ResponseValue = message;
-                        }
-                    }
-                }
-                else
-                {
-                    logger.LogWarning($"Flow warning, recieved message : {message}");
-                }
-            }
-            else
-            {
-                if (executedMethod != null)
-                {
-                    if (executedMethod.IsCompleted)
-                    {
-                        await ExecuteMethod(command);
-                    }
-                    else
-                    {
-                        logger.LogWarning($"Interrupted method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
-                     //   executedMethod.IsCompleted = true;//fix response
-                        await ExecuteMethod(command);
-                    }
-                }
-                else
-                {
-                    await ExecuteMethod(command);
-                }
-            }
+            await ReadMessage();
         }
 
         private async Task ExecuteMethod(ProtocolCommands command)
@@ -298,15 +326,17 @@ namespace Worker.Host
             return res;
         }
 
-        public async Task<string> ReadMessage()
+        public async Task ReadMessage()
         {         
             try
             {
-               // logger.LogInformation($"port :{portName}, reading: {stream.ReadExisting()}");
-                string res = stream.ReadLine();
-                var snew = new string(res.Where(c => !char.IsControl(c)).ToArray());
-                logger.LogInformation($"port :{port.PortName}, readed: {res}, filtered:{snew}");
-                return snew;
+                do
+                {
+                    string res = stream.ReadLine();
+                    var snew = new string(res.Where(c => !char.IsControl(c)).ToArray());
+                    logger.LogInformation($"port :{port.PortName}, readed: {res}, filtered:{snew}");
+                    InputQueue.Enqueue(snew);
+                } while (stream.RtsEnable == true);
             }
             catch (IOException ex)
             {
@@ -320,8 +350,7 @@ namespace Worker.Host
             {
                 logger.LogWarning(ex.ToString());
             }
-            
-            return null;
+            return;
         }
 
         public Task ExecuteAsync(CancellationToken stoppingToken)

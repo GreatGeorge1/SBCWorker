@@ -26,6 +26,23 @@ namespace DevConsole
                 list.Add(ProtocolMethodView.MapProtocolMethod(item.Value));
             }
             ConsoleTableBuilder.From(list).WithFormat(ConsoleTableBuilderFormat.Minimal).ExportAndWriteLine();
+
+            CustomQueue<string> cqueue = new CustomQueue<string>();
+            cqueue.EnqueueEvent += EnqueueAction;
+            cqueue.Enqueue("item");
+            cqueue.Enqueue("item2");
+            Console.WriteLine(cqueue.Count);
+        }
+        public static async void EnqueueAction(object sender, CustomQueueEnqueueEventArgs<string> e)
+        {
+            if (!String.IsNullOrWhiteSpace(e.Item))
+            {
+                Console.WriteLine($"Enqueue:{e.Item}");
+            }
+            else
+            {
+                Console.WriteLine("EnqueueAction error");
+            }
         }
     }
 
@@ -56,4 +73,5 @@ namespace DevConsole
             return res;
         }
     }
+
 }
