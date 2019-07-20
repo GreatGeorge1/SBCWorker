@@ -62,7 +62,7 @@ namespace Worker.Host
                 config.GetSection("ListenerOptions").Bind(options);
                 foreach (var port in options.Ports)
                 {
-                    services.AddSingleton(new ListenerPort(port.PortName,port.IsRS485));
+                    services.AddSingleton(new SerialConfig(port.PortName,port.IsRS485));
                 }
                 services.AddHostedService<ListenerHost>();
 

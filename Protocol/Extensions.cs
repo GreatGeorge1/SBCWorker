@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
-namespace Worker.Host
+namespace Protocol
 {
     public static class Extensions
     {

@@ -30,7 +30,7 @@ namespace Worker.Host
                 logger.LogInformation("Verifying the hash...");
                 // Console.WriteLine($"New hash: {hash}");
 
-                if (VerifyMd5Hash(md5Hash, cardf, md5f))
+                if (Protocol.Protocol.VerifyMd5Hash(md5Hash, cardf, md5f))
                 {
                     logger.LogInformation("The hashes are the same.");
                     return true;

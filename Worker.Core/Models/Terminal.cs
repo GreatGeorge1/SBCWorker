@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Text;
 
 namespace Worker.Core.Models
 {
     public class Terminal : SoftEntity<long>, IExternal
     {
-        [Required]
-        [EnumDataType(typeof(AccessLevel))]
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EnumDataType(typeof(AccessLevel))]
         public AccessLevel AccessLevel { get; set; }
         public string Alias { get; set; }
         public string Mac { get; set; }

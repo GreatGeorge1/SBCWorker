@@ -17,7 +17,7 @@ namespace Worker.Host
             _serviceProvider = serviceProvider;
             _serviceScopeFactory = serviceScopeFactory;
         }
-        public Listener NewListener(ListenerPort port)
+        public Listener NewListener(SerialConfig port)
         {
             var logger = _serviceProvider.GetService<ILogger<Listener>>();
             var context = _serviceProvider.GetService<ControllerDbContext>();

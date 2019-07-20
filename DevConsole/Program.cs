@@ -1,10 +1,10 @@
 ﻿using ConsoleTableExt;
+using Protocol;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using Worker.Host;
 
 namespace DevConsole
 {
@@ -21,19 +21,19 @@ namespace DevConsole
             //data.Columns.Add("IsHashable", typeof(bool));
             //data.Columns.Add("IsControllerHosted", typeof(bool));
             var list = new List<ProtocolMethodView>();
-            foreach(var item in Protocol.Methods)
+            foreach(var item in Protocol.Protocol.GetMethods())
             {
                 list.Add(ProtocolMethodView.MapProtocolMethod(item.Value));
             }
             ConsoleTableBuilder.From(list).WithFormat(ConsoleTableBuilderFormat.Minimal).ExportAndWriteLine();
 
-            CustomQueue<string> cqueue = new CustomQueue<string>();
+            Protocol.MessageQueue<string> cqueue = new Protocol.MessageQueue<string>();
             cqueue.EnqueueEvent += EnqueueAction;
             cqueue.Enqueue("item");
             cqueue.Enqueue("item2");
             Console.WriteLine(cqueue.Count);
         }
-        public static async void EnqueueAction(object sender, CustomQueueEnqueueEventArgs<string> e)
+        public static void EnqueueAction(object sender, MessageQueueEnqueueEventArgs<string> e)
         {
             if (!String.IsNullOrWhiteSpace(e.Item))
             {
@@ -46,10 +46,10 @@ namespace DevConsole
         }
     }
 
-    class ProtocolMethodView : ProtocolMethod
+    class ProtocolMethodView : Protocol.Method
     {
         public new string ResponseHeaders { get; set; }
-        public static ProtocolMethodView MapProtocolMethod(ProtocolMethod input)
+        public static ProtocolMethodView MapProtocolMethod(Protocol.Method input)
         {
             var res = new ProtocolMethodView
             {

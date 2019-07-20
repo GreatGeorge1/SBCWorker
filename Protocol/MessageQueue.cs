@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Worker.Host
+namespace Protocol
 {
-    public class CustomQueue<T>:Queue<T>
+    public class MessageQueue<T>:Queue<T>
     {
         public new void Enqueue(T item)
         {
@@ -15,14 +15,14 @@ namespace Worker.Host
 
         protected void OnEnqueueEvent(T item)
         {
-            EnqueueEvent?.Invoke(this, new CustomQueueEnqueueEventArgs<T>(item));
+            EnqueueEvent?.Invoke(this, new MessageQueueEnqueueEventArgs<T>(item));
         }
-        public delegate void CustomQueueEnqueueEventHandler(object sender, CustomQueueEnqueueEventArgs<T> e);
+        public delegate void CustomQueueEnqueueEventHandler(object sender, MessageQueueEnqueueEventArgs<T> e);
       
     }
-    public class CustomQueueEnqueueEventArgs<T>
+    public class MessageQueueEnqueueEventArgs<T>
     {
-        public CustomQueueEnqueueEventArgs(T item)
+        public MessageQueueEnqueueEventArgs(T item)
         {
             Item = item;
         }

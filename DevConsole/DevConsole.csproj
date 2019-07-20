@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -10,9 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Worker.Core\Worker.Core.csproj" />
-    <ProjectReference Include="..\Worker.EntityFrameworkCore\Worker.EntityFrameworkCore.csproj" />
-    <ProjectReference Include="..\Worker\Worker.Host.csproj" />
+    <ProjectReference Include="..\Protocol\Protocol.csproj" />
   </ItemGroup>
 
 </Project>

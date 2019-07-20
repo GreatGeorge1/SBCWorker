@@ -13,349 +13,65 @@ using System.Threading;
 using System.Threading.Tasks;
 using Worker.EntityFrameworkCore;
 using Worker.Models;
+using Protocol;
+using Worker.Host.Transports;
+using Protocol.Events;
 
 namespace Worker.Host
 {
-    public partial class Listener 
+    public partial class Listener
     {
         private readonly ILogger logger;
         private readonly ControllerDbContext context;
-        private readonly ListenerPort port;
-        private SerialPort stream;
-        private ExecutedMethod executedMethod { get; set; }
-        private CustomQueue<string> InputQueue { get; set; }
+        // private readonly SerialConfig port;
+        private readonly Protocol.Host host;
 
-        public Listener(ILogger logger, ListenerPort port,
+        public Listener(ILogger logger, SerialConfig port,
            ControllerDbContext dbcontext)
         {
             this.logger = logger;
-            this.port = port;
             this.context = dbcontext;
-            InputQueue = new CustomQueue<string>();
-            InputQueue.EnqueueEvent += EnqueueAction;
+            this.host = new Protocol.Host(new SerialPortTransport(port, logger));
+            host.CardCommandEvent += OnCardCommandEvent;
+            host.FingerCommandEvent += OnFingerCommandEvent;
         }
 
-        public async void EnqueueAction(object sender, CustomQueueEnqueueEventArgs<string> e)
+        private async void OnCardCommandEvent(object sender, CardCommandEventArgs args)
         {
-            string input;
-            bool dequeue = InputQueue.TryDequeue(out input);
-            if (dequeue)
+            var res = await VerifyCard(args.Card, args.Md5Hash);
+            if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Card)
             {
-                if (!String.IsNullOrWhiteSpace(input))
-                {
-                    var message = input;
-                    ProtocolCommands command = ProtocolCommands.NotSet;
-
-                    if (message.Equals("COMPLETED"))
-                    {
-                        logger.LogWarning("COMPLETED");
-                        executedMethod.IsCompleted = true;
-                        return;
-                    }
-
-                    try
-                    {
-                        command = await ReadCommand(message);
-
-                    }
-                    catch (CommandHeaderNotFoundException ex)
-                    {
-                        logger.LogInformation(ex.Message);
-                    }
-
-                    if (command == ProtocolCommands.NotSet)
-                    {
-                        if (executedMethod != null)
-                        {
-                            if (!executedMethod.MethodInfo.IsControllerHosted)
-                            {
-                                if (executedMethod.MethodInfo.HasCommandValue && string.IsNullOrWhiteSpace(executedMethod.CommandValue))
-                                {
-                                    executedMethod.CommandValue = message;
-                                }
-                                else if (executedMethod.MethodInfo.IsHashable && string.IsNullOrWhiteSpace(executedMethod.Hash))
-                                {
-                                    executedMethod.Hash = message;
-                                }
-                            }
-                            else
-                            {
-                                if (executedMethod.MethodInfo.HasResponseHeader && executedMethod.ResponseHeader == ProtocolResponse.NotSet)
-                                {
-                                    try
-                                    {
-                                        var responseHeader = await ReadResponse(message);
-                                    }
-                                    catch (ResponseHeaderNotFoundException ex)
-                                    {
-
-                                        logger.LogWarning($"Flow warning, recieved message : {message}");
-                                        executedMethod = null;
-                                        logger.LogWarning("Executed method set to NULL");
-                                    }
-                                }
-                                else if (executedMethod.MethodInfo.HasResponseValue && string.IsNullOrWhiteSpace(executedMethod.ResponseValue))
-                                {
-                                    executedMethod.ResponseValue = message;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            logger.LogWarning($"Flow warning, recieved message : {message}");
-                        }
-                    }
-                    else
-                    {
-                        if (executedMethod != null)
-                        {
-                            if (executedMethod.IsCompleted)
-                            {
-                                await ExecuteMethod(command);
-                            }
-                            else
-                            {
-                                logger.LogWarning($"Interrupted method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
-                                //   executedMethod.IsCompleted = true;//fix response
-                                await ExecuteMethod(command);
-                            }
-                        }
-                        else
-                        {
-                            await ExecuteMethod(command);
-                        }
-                    }
-                }
-                else
-                {
-                    logger.LogWarning("EnqueueAction error");
-                }
+                return;
+            }
+            if (res)
+            {
+                await host.SendResponseToTerminal(ResponseHeader.CardOk, CommandHeader.Card);
             }
             else
             {
-                logger.LogWarning("EnqueueAction error");
+                await host.SendResponseToTerminal(ResponseHeader.CardError, CommandHeader.Card);
             }
         }
 
-        public async Task ListenAsync(CancellationToken stoppingToken)
+        private async void OnFingerCommandEvent(object sender, FingerCommandEventArgs args)
         {
-            if (!PortHelpers.PortNameExists(port.PortName))
+            var res = await VerifyFinger(args.Finger, args.Md5Hash);
+            if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Finger)
             {
-                throw new Exception($"{port.PortName} not exists");
+                return;
             }
-            stream = new SerialPort(port.PortName);
-            stream.BaudRate = 115200;
-            stream.ReadTimeout = 500;
-            stream.WriteTimeout = 500;
-            stream.DataReceived += DataReceivedAction;
-            stream.ErrorReceived += ErrorReceivedAction;
-            stream.PinChanged += PinChangedAction;
-            stream.Parity = Parity.None;
-            stream.StopBits = StopBits.One;
-            stream.DataBits = 8;
-
-            if (port.IsRS485)
+            if (res)
             {
-                stream.Handshake = Handshake.None;
-                stream.RtsEnable = true;
-                logger.LogInformation($"Port {port.PortName} in RS485 mode");
+                await host.SendResponseToTerminal(ResponseHeader.FingerOk,CommandHeader.Finger);
             }
-        
-            stream.Open();
-            if (!stream.IsOpen)
-            {
-                logger.LogCritical($"Error opening serial port {port.PortName}");
-                throw new Exception($"Error opening serial port {port.PortName}");
+            else{
+                await host.SendResponseToTerminal(ResponseHeader.FingerError, CommandHeader.Finger);
             }
-            logger.LogInformation($"Port {port.PortName} open");
-            if (stream == null)
-            {
-                logger.LogCritical($"No serial port {port.PortName}");
-                throw new Exception($"No serial port {port.PortName}");
-            }
-            if (stream.CtsHolding)
-            {
-                logger.LogInformation($"Cts detected {port.PortName}");
-            }
-            else
-            {
-                logger.LogInformation($"Cts NOT detected {port.PortName}");
-            }
-            logger.LogInformation($"Port listener started: {port.PortName}");
         }
 
-        private void PinChangedAction(object sender, SerialPinChangedEventArgs e)
+        public Task ExecuteAsync(CancellationToken ct)
         {
-            logger.LogInformation($"Port {port.PortName} pin changed: {e.ToString()}");
-        }
-
-        private void ErrorReceivedAction(object sender, SerialErrorReceivedEventArgs e)
-        {
-            logger.LogInformation($"Port {port.PortName} erorr: {e.ToString()}");
-        }
-
-        private async void DataReceivedAction(object sender, SerialDataReceivedEventArgs e)
-        {
-            logger.LogInformation("DataReceived Action raised");
-            await ReadMessage();
-        }
-
-        private async Task ExecuteMethod(ProtocolCommands command)
-        {
-            ProtocolMethod methodInfo;
-            Protocol.Methods.TryGetValue(command, out methodInfo);
-            executedMethod = null;
-            executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false, ResponseHeader=ProtocolResponse.NotSet };
-            executedMethod.PropertyChanged += OnExecuteMethodChange;
-            logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
-        }
-
-        private async void OnExecuteMethodChange(object sender, PropertyChangedEventArgs args)
-        {
-            logger.LogInformation($"Executed method property changed: {args.PropertyName}");
-            if (!executedMethod.IsFired)
-            {
-                if (!executedMethod.MethodInfo.IsControllerHosted)
-                {
-                    if (Protocol.CheckReadyTerminalHosted(executedMethod))
-                    {
-                        executedMethod.IsFired = true;
-                        await ProcessTerminalHostedMethod();
-                    }
-                }
-                else
-                {
-                    if (Protocol.CheckReadyControllerHosted(executedMethod))
-                    {
-                        executedMethod.IsFired = true;
-                        await ProcessControllerHostedMethod();
-                    }
-                }
-            }
-        }
-
-        private async Task ProcessTerminalHostedMethod()
-        {
-            switch (executedMethod.MethodInfo.CommandHeader)
-            {
-                case ProtocolCommands.Card:
-                    var res = await VerifyCard(executedMethod.CommandValue, executedMethod.Hash);
-                    if (res)
-                    {
-                        executedMethod.ResponseHeader = ProtocolResponse.CardOk;
-                        var response = executedMethod.CreateResponse();
-                        while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == ProtocolCommands.Card)
-                        {
-                            await WriteMessage(response);
-                            await Task.Delay(200);
-                        }
-                    }
-                    else
-                    {
-                        executedMethod.ResponseHeader = ProtocolResponse.CardError;
-                        var response = executedMethod.CreateResponse();
-                        while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader==ProtocolCommands.Card)
-                        {
-                            await WriteMessage(response);
-                            await Task.Delay(200);
-                        }
-                    }
-                   // executedMethod.IsCompleted = true;
-                    break;
-                case ProtocolCommands.Finger:
-                    var finger = await VerifyFinger(executedMethod.CommandValue, executedMethod.Hash);
-                    if (finger)
-                    {
-                        executedMethod.ResponseHeader = ProtocolResponse.FingerOk;
-                        var response = executedMethod.CreateResponse();
-                        while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == ProtocolCommands.Finger)
-                        {
-                            await WriteMessage(response);
-                            await Task.Delay(200);
-                        }
-                    }
-                    else
-                    {
-                        executedMethod.ResponseHeader = ProtocolResponse.FingerError;
-                        var response = executedMethod.CreateResponse();
-                        while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == ProtocolCommands.Finger)
-                        {
-                            await WriteMessage(response);
-                            await Task.Delay(200);
-                        }
-                    }
-                    //executedMethod.IsCompleted = true;
-                    break;
-                //case ProtocolCommands.
-            }
-        }
-
-        private async Task ProcessControllerHostedMethod()
-        {
-            //switch (executedMethod.MethodInfo.CommandHeader)
-            //{
-            //    case ProtocolCommands.Card:
-            //        break;
-            //}
-        }
-
-
-        private async Task<ProtocolCommands> ReadCommand(string command)
-        {
-            if (string.IsNullOrWhiteSpace(command))
-            {
-                logger.LogInformation($"Command is null {command}");
-                return ProtocolCommands.NotSet;
-            }
-            logger.LogInformation($"Command is {command}");
-
-            var res = Protocol.GetCommandHeader(command);
-            return res;
-        }
-
-        private async Task<ProtocolResponse> ReadResponse(string response)
-        {
-            if (string.IsNullOrEmpty(response))
-            {
-                logger.LogInformation($"Command is null {response}");
-                return ProtocolResponse.NotSet;
-            }
-            logger.LogInformation($"Message is {response}");
-
-            var res = Protocol.GetResponseHeader(response);
-            return res;
-        }
-
-        public async Task ReadMessage()
-        {         
-            try
-            {
-                do
-                {
-                    string res = stream.ReadLine();
-                    var snew = new string(res.Where(c => !char.IsControl(c)).ToArray());
-                    logger.LogInformation($"port :{port.PortName}, readed: {res}, filtered:{snew}");
-                    InputQueue.Enqueue(snew);
-                } while (stream.RtsEnable == true);
-            }
-            catch (IOException ex)
-            {
-                logger.LogWarning(ex.ToString());
-            }
-            catch (TimeoutException ex)
-            {
-                logger.LogWarning("r:timeout");
-            }
-            catch (InvalidOperationException ex)
-            {
-                logger.LogWarning(ex.ToString());
-            }
-            return;
-        }
-
-        public Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            _=ListenAsync(stoppingToken);
+            _=host.ExecuteAsync(ct);
             return Task.CompletedTask;
         }
     }
