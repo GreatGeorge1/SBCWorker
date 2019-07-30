@@ -19,6 +19,7 @@ namespace Protocol
     {
         public Host(ITransport transport, ILogger logger = null)
         {
+            this.transport = transport;
             transport.InputQueue.EnqueueEvent += DataReceived;
             if (logger != null)
             {

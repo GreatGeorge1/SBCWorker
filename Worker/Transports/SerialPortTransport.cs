@@ -23,7 +23,6 @@ namespace Worker.Host.Transports
         {
             InputQueue = new MessageQueue<string>();
             this.port = port ?? throw new ArgumentNullException(nameof(port));
-            this.stream = stream ?? throw new ArgumentNullException(nameof(stream));
             if (logger != null)
             {
                 this.logger = logger;
