@@ -200,6 +200,7 @@ namespace Protocol
         public static bool CheckReadyControllerHosted(ExecutedMethod executedMethod)
         {
             bool ready = true;
+            //return ready;
             if (executedMethod.MethodInfo.IsControllerHosted)
             {
                 if (executedMethod.MethodInfo.HasResponseHeader)
@@ -212,8 +213,10 @@ namespace Protocol
                 if (executedMethod.MethodInfo.HasResponseValue)
                 {
                     if (string.IsNullOrWhiteSpace(executedMethod.ResponseValue))
-                    {
+                    {//////////////////////////////
+                       // ready = true;/////////////////////
                         ready = false;
+                      ///////////////////////////
                     }
                 }
             }

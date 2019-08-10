@@ -25,15 +25,39 @@ namespace Worker.Host
         private readonly ControllerDbContext context;
         // private readonly SerialConfig port;
         private readonly Protocol.Host host;
+        private readonly string PortName;
+        private readonly MessageQueue<SignalRMessage> inputQueue;
 
         public Listener(ILogger logger, SerialConfig port,
-           ControllerDbContext dbcontext)
+           ControllerDbContext dbcontext, MessageQueue<SignalRMessage> inputQueue)
         {
+            PortName = port.PortName;
             this.logger = logger;
             this.context = dbcontext;
             this.host = new Protocol.Host(new SerialPortTransport(port, logger));
             host.CardCommandEvent += OnCardCommandEvent;
             host.FingerCommandEvent += OnFingerCommandEvent;
+
+            this.inputQueue = inputQueue;
+            inputQueue.EnqueueEvent += OnSignalRMessage;
+        }
+
+        public async void OnSignalRMessage(object sender, MessageQueueEnqueueEventArgs<SignalRMessage> args)
+        {
+            //if (PortName != args.Item.Port)
+            //{
+            //    return;
+            //}
+            Console.WriteLine("OnSignalRMessage HIT");
+            var item = inputQueue.Dequeue();//govno
+            switch(args.Item.Method){
+                case SignalRMethod.GetFingerTimeoutCurrent:
+                    Console.WriteLine("OnSignalRMessage GetFingerTimeoutCurrent HIT");
+                    host.ProcessMessage(CommandHeader.FingerTimeoutCurrent.GetDisplayName());
+                    break;
+                default:Console.WriteLine("OnSignalRMessage UNexpected");
+                    break;
+            }
         }
 
         private async void OnCardCommandEvent(object sender, CardCommandEventArgs args)

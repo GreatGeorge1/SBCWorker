@@ -65,9 +65,10 @@ namespace Protocol
             return result;
         }
 
-        protected void ExecuteMethod(CommandHeader command)
+        public void ExecuteMethod(CommandHeader command)
         {
             Method methodInfo;
+            Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
             Protocol.GetMethods().TryGetValue(command, out methodInfo);
             executedMethod = null;
             executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false, ResponseHeader = ResponseHeader.NotSet };
@@ -75,16 +76,29 @@ namespace Protocol
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
             executedMethod.RepeatLimit = 25;
             logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
+            Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
         }
 
 
 
         private async Task ProcessControllerMethodAsync()
         {
-            //switch (executedMethod.MethodInfo.CommandHeader)
-            //{
-            //    case ProtocolCommands.Card:
-            //        break;
+            switch (executedMethod.MethodInfo.CommandHeader)
+            {
+                case CommandHeader.FingerTimeoutCurrent:
+                    // executedMethod.ResponseHeader = header;
+                    //var response = executedMethod.CreateResponse();
+                    //var result = false;
+                    while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
+                    {
+                        Console.WriteLine("FingerTimeoutCurrent switch case");
+                        await transport.WriteMessageAsync(Protocol.CreateCommand(CommandHeader.FingerTimeoutCurrent));
+                        executedMethod.RepeatCount++;
+                        await Task.Delay(200);
+                    }
+                    //  return result;
+                    break;
+            }
         }
         #region protocol host events
         public delegate void CardCommandEventHandler(object sender, CardCommandEventArgs e);
@@ -187,7 +201,7 @@ namespace Protocol
             return res;
         }
 
-        private void ProcessMessage(string input)
+        public void ProcessMessage(string input)
         {
             var message = input;
             CommandHeader command = CommandHeader.NotSet;
