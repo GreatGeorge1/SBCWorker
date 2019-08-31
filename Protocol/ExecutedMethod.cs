@@ -8,8 +8,8 @@ namespace Protocol
     public class ExecutedMethod : INotifyPropertyChanged
     {
         public Method MethodInfo { get; set; }
-        private string commandValue;
-        public string CommandValue
+        private byte[] commandValue;
+        public byte[] CommandValue
         {
             get { return commandValue; }
             set
@@ -28,8 +28,8 @@ namespace Protocol
                 OnPropertyChanged("ResponseHeader");
             }
         }
-        private string responseValue;
-        public string ResponseValue
+        private byte[] responseValue;
+        public byte[] ResponseValue
         {
             get { return this.responseValue; }
             set
@@ -38,14 +38,14 @@ namespace Protocol
                 OnPropertyChanged("ResponseValue");
             }
         }
-        private string hash;
-        public string Hash
+        private byte checkSum;
+        public byte CheckSum
         {
-            get { return hash; }
+            get { return checkSum; }
             set
             {
-                hash = value;
-                OnPropertyChanged("Hash");
+                checkSum = value;
+                OnPropertyChanged("CheckSum");
             }
         }
         private bool isFired;
@@ -111,10 +111,15 @@ namespace Protocol
             }
         }
 
-        public string CreateResponse()
+        public byte[] CreateResponse()
         {
             var command = this.ResponseHeader;
-            return $"{command.GetDisplayName()}\r\n";
+            //TODO implement
+            //return $"{command.GetDisplayName()}\r\n";
+            byte[] msg = { 0x02, 0xD6, 0xC7, 0x00, 0x01, 0x01, 0x03, 0x0d,0x0a };
+
+            //return $"{Encoding.ASCII.GetString(msg)}\r\n";
+            return msg;
         }
     }
 }

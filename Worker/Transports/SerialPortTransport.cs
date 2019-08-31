@@ -12,16 +12,16 @@ using System.Threading.Tasks;
 
 namespace Worker.Host.Transports
 {
-    public class SerialPortTransport : ITransport
+    public class SerialPortTransport : IByteTransport
     {
         private readonly SerialConfig port;
         private SerialPort stream;
         private ILogger logger { get; set; }
-        public MessageQueue<string> InputQueue { get; set; }
+        public MessageQueue<byte[]> InputQueue { get; set; }
 
         public SerialPortTransport(SerialConfig port, ILogger logger = null)
         {
-            InputQueue = new MessageQueue<string>();
+            InputQueue = new MessageQueue<byte[]>();
             this.port = port ?? throw new ArgumentNullException(nameof(port));
             if (logger != null)
             {
@@ -51,6 +51,8 @@ namespace Worker.Host.Transports
             stream.Parity = Parity.None;
             stream.StopBits = StopBits.One;
             stream.DataBits = 8;
+            stream.Encoding = Encoding.UTF8;
+            stream.NewLine = "\r\n";
 
             if (port.IsRS485)
             {
@@ -104,16 +106,31 @@ namespace Worker.Host.Transports
         /// Читает сообщение и добавляет построчно в InputQueue
         /// </summary>
         /// <returns></returns>
-        public Task ReadMessageAsync()
+        public async Task ReadMessageAsync()
         {
             try
             {
                 do
                 {
-                    string res = stream.ReadLine();
-                    var snew = new string(res.Where(c => !char.IsControl(c)).ToArray());
-                    logger.LogInformation($"port :{port.PortName}, readed: {res}, filtered:{snew}");
-                    InputQueue.Enqueue(snew);
+                    await Task.Delay(100);
+                    var bytes = new List<byte>();
+                    byte r = 0x0d;//'\r'
+                    byte n = 0x0a;//'\n'
+                    byte temp;
+                    do
+                    {
+                        var _byte = stream.ReadByte();
+                        temp = (byte)_byte;
+                        if(temp != r && temp != n)
+                        {
+                            bytes.Add((byte)_byte);
+                        }
+                    }
+                    while (stream.BytesToRead > 0 && !(temp == r || temp==n));
+                    var res = bytes.ToArray();
+                    string str = BitConverter.ToString(res);
+                    Console.WriteLine(str);       
+                    InputQueue.Enqueue(res);
                 } while (stream.RtsEnable == true);
             }
             catch (IOException ex)
@@ -128,10 +145,10 @@ namespace Worker.Host.Transports
             {
                 logger.LogWarning(ex.ToString());
             }
-            return Task.CompletedTask;
+            return;
         }
 
-        public async Task<bool> WriteMessageAsync(string message)
+        public async Task<bool> WriteMessageAsync(byte[] message)
         {
             if (stream.IsOpen)
             {
@@ -142,7 +159,8 @@ namespace Worker.Host.Transports
                         stream.RtsEnable = false;
                         await Task.Delay(50);
                     }
-                    stream.Write(message);
+                   // stream.Write(message);
+                    stream.Write(message, 0, message.Length);
                     if (port.IsRS485)
                     {
                         await Task.Delay(50);

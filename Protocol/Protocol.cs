@@ -268,6 +268,14 @@ namespace Protocol
         public CommandHeaderNotFoundException(string message) : base(message)
         {
         }
+
+        public CommandHeaderNotFoundException()
+        {
+        }
+
+        public CommandHeaderNotFoundException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
     }
 
     public class ResponseHeaderNotFoundException : Exception
@@ -275,6 +283,15 @@ namespace Protocol
         public ResponseHeaderNotFoundException(string message) : base(message)
         {
         }
+
+        public ResponseHeaderNotFoundException()
+        {
+        }
+
+        public ResponseHeaderNotFoundException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
+
     }
 
     public delegate void RepeatCountReachedLimitEventHandler(object sender, RepeatCountReachedLimitArgs e);

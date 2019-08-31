@@ -45,6 +45,7 @@ namespace Worker.Host
             logger.LogInformation($"cardf byte length {Encoding.UTF8.GetBytes(cardf).Length}");
 
             var md5f = new string(md5.Where(c => !char.IsControl(c)).ToArray());
+            
 
             using (MD5 md5Hash = MD5.Create())
             {
