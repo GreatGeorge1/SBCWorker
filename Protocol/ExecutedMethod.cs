@@ -18,16 +18,7 @@ namespace Protocol
                 OnPropertyChanged("CommandValue");
             }
         }
-        private ResponseHeader responseHeader;
-        public ResponseHeader ResponseHeader
-        {
-            get { return responseHeader; }
-            set
-            {
-                responseHeader = value;
-                OnPropertyChanged("ResponseHeader");
-            }
-        }
+
         private byte[] responseValue;
         public byte[] ResponseValue
         {
@@ -113,7 +104,7 @@ namespace Protocol
 
         public byte[] CreateResponse()
         {
-            var command = this.ResponseHeader;
+            //var command = this.ResponseHeader;
             //TODO implement
             //return $"{command.GetDisplayName()}\r\n";
             byte[] msg = { 0x02, 0xD6, 0xC7, 0x00, 0x01, 0x01, 0x03, 0x0d,0x0a };

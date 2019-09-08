@@ -6,29 +6,25 @@ namespace Protocol
     public enum Error
     {
         [Display(Name = "0x01")]
-        Uart = 0,
+        Uart = 0x01,
         [Display(Name = "0x02")]
-        Ble,
+        Ble = 0x02,
         [Display(Name = "0x03")]
-        System,
-        [Display(Name = "0x04")]
-        Ota,
-        [Display(Name = "0x05")]
-        Wifi,
-        [Display(Name = "0x06")]
-        WifiSsid,
+        System = 0x03,
         [Display(Name = "0x07")]
-        Timeout,
+        Timeout = 0x07,
         [Display(Name = "0x08")]
-        UserExist,
+        UserExist =0x08,
         [Display(Name = "0x09")]
-        FingerExist,
+        FingerExist = 0x09,
         [Display(Name = "0x0A")]
-        Fingerprint,
+        Fingerprint = 0x0A,
         [Display(Name = "0x0B")]
-        DbFull,
+        DbFull = 0x0B,
         [Display(Name = "0x0C")]
-        Terminal
+        Terminal = 0x0C,
+        FingerPrintScanner = 0x0E,
+        NotSet = 0
     }
 
     public class ProtocolException : Exception {}

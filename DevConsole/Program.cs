@@ -30,7 +30,7 @@ namespace DevConsole
             //data.Columns.Add("IsHashable", typeof(bool));
             //data.Columns.Add("IsControllerHosted", typeof(bool));
             var list = new List<ProtocolMethodView>();
-            foreach(var item in Protocol.Protocol.GetMethods())
+            foreach(var item in Protocol.Static.GetMethods())
             {
                 list.Add(ProtocolMethodView.MapProtocolMethod(item.Value));
             }
@@ -167,20 +167,10 @@ namespace DevConsole
             {
                 CommandHeader=input.CommandHeader,
                 HasCommandValue=input.HasCommandValue,
-                HasResponseHeader=input.HasResponseHeader,
                 HasResponseValue=input.HasResponseValue,
                 DirectionTo=input.DirectionTo,
-                HasCheckSum=input.HasCheckSum
             };
             string responseHeaders = "";
-            if(input.ResponseHeaders!=null && input.ResponseHeaders.Any())
-            {
-                foreach(var item in input.ResponseHeaders)
-                {
-                    responseHeaders += $"{item.ToString()}; ";
-                }
-            }
-            res.ResponseHeaders = responseHeaders;
 
             return res;
         }

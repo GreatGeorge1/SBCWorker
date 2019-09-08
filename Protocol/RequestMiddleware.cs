@@ -21,19 +21,19 @@ namespace Protocol
                     if(IsValidCommand(message, out command))
                     {
                         Method methodInfo;
-                        Protocol.GetMethods().TryGetValue(command, out methodInfo);
+                        Protocol.Static.GetMethods().TryGetValue(command, out methodInfo);
                         executedMethod.MethodInfo = methodInfo;
                         if(IsValidCheckSum(message, out checksum))
                         {
                             var value = message.Skip(4).Take(message[3]).ToArray();
-                            var strValue = Encoding.ASCII.GetString(value);
-                            executedMethod.CommandValue = strValue;
+                          //  var strValue = Encoding.ASCII.GetString(value);
+                            executedMethod.CommandValue = value;
                             return true;
                         } 
                     }
                 }
             }
-            mtype = MessageType.NULL;
+            mtype = MessageType.NotSet;
             checksum = new byte();
             return false;
         }
@@ -65,21 +65,16 @@ namespace Protocol
         {
             var temp = message[1];
            // Debug.Assert(message[1] == 0xd5);
-            mtype = MessageType.NULL;
-            switch (temp)
+            mtype = MessageType.NotSet;
+            foreach (var item in Enum.GetValues(typeof(MessageType)))
             {
-                case 0xD5:
-                    mtype = MessageType.REQ;
+                if (temp == Convert.ToInt32(item))
+                {
+                    mtype = (MessageType)item;
                     return true;
-                case 0xD6:
-                    mtype = MessageType.RES;
-                    return true;
-                case 0xD7:
-                    mtype = MessageType.ACK;
-                    return true;
-                default:
-                    return false;
+                }
             }
+            return false;
         }
 
         public static bool IsValidCommand(byte[] message, out CommandHeader command)
@@ -87,14 +82,15 @@ namespace Protocol
             var temp = message[2];
            // Debug.Assert(message[2] == 0xC7);
             command = CommandHeader.NotSet;
-            switch (temp)
+            foreach(var item in Enum.GetValues(typeof(CommandHeader)))
             {
-                case (byte)0xC7:
-                    command = CommandHeader.Card;
+                if (temp == Convert.ToInt32(item))
+                {
+                    command =(CommandHeader)item;
                     return true;
-                default:
-                    return false;
+                }
             }
+            return false;
         }
 
         public static bool IsValidCheckSum(byte[] message, out byte newChecksum)
@@ -127,9 +123,10 @@ namespace Protocol
 
     public enum MessageType
     {
-        NULL,
-        REQ,
-        RES,
-        ACK
+        NotSet = 0,
+        REQ = 0xD5,
+        RES = 0xD6,
+        ACK = 0xD7,
+        NACK = 0xD8
     }
-}
+} 

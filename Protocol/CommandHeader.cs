@@ -6,40 +6,27 @@ namespace Protocol
     public enum CommandHeader
     {
         [Display(Name = "CARD")]
-        Card = 0,
+        Card = 0xC7,
         [Display(Name = "BLE")]
-        Ble,
+        Ble = 0xB7,
         [Display(Name = "FINGER")]
-        Finger,
-        [Display(Name = "FINGER_TIMEOUT")]
-        FingerTimeout,
+        Finger = 0xF7,
         [Display(Name = "ERROR")]
-        Error,
-        [Display(Name = "OTA")]
-        Ota,
-        [Display(Name = "WiFi_INIT")]
-        WifiInit,
-        [Display(Name = "WiFI_SPOTS")]
-        WifiSpots,
+        Error = 0xFF,
         [Display(Name = "FINGER_WRITE_IN_BASE")]
-        FingerWriteInBase,
+        FingerWriteInBase = 0xF6,
         [Display(Name = "FINGER_SET_TIMEOUT")]
-        FingerSetTimeout,
+        FingerSetTimeout = 0xF3,
         [Display(Name = "FINGER_TIMEOUT_CURRENT")]
-        FingerTimeoutCurrent,
+        FingerTimeoutCurrent = 0xF2,
         [Display(Name = "FINGER_DELETE_ID")]
-        FingerDeleteId,
+        FingerDeleteId = 0xF5,
         [Display(Name = "FINGER_DELETE_ALL")]
-        FingerDeleteAll,
+        FingerDeleteAll = 0xF4,
         [Display(Name = "TERMINAL_CONF")]
-        TerminalConf,
-        [Display(Name = "TERMINAL_MODE")]
-        TerminalMode,
-        [Display(Name = "TERMINAL_RESET")]
-        TerminalReset,
-        [Display(Name = "START")]
-        Start,
-        [Display(Name = "NOTSET")]
-        NotSet//fix
+        TerminalConf = 0xA1,
+        TerminalGetConf = 0xA2,
+        TerminalSysInfo = 0xA3,
+        NotSet = 0
     }
 }

@@ -6,13 +6,12 @@ namespace Protocol.Events
 {
     public class FingerCommandEventArgs
     {
-        public readonly string Finger;
-        public readonly string Md5Hash;
+        public readonly byte[] Finger;
 
-        public FingerCommandEventArgs(string finger, string md5Hash)
+        public FingerCommandEventArgs(byte[] finger)
         {
             Finger = finger;
-            Md5Hash = md5Hash;
+           
         }
     }
 }

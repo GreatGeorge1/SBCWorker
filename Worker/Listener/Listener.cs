@@ -53,7 +53,7 @@ namespace Worker.Host
             switch(args.Item.Method){
                 case SignalRMethod.GetFingerTimeoutCurrent:
                     Console.WriteLine("OnSignalRMessage GetFingerTimeoutCurrent HIT");
-                    host.ProcessMessage(CommandHeader.FingerTimeoutCurrent.GetDisplayName());
+                  //  host.ProcessMessage(CommandHeader.FingerTimeoutCurrent.GetDisplayName());
                     break;
                 default:Console.WriteLine("OnSignalRMessage UNexpected");
                     break;
@@ -62,34 +62,34 @@ namespace Worker.Host
 
         private async void OnCardCommandEvent(object sender, CardCommandEventArgs args)
         {
-            var res = await VerifyCard(args.Card, args.Md5Hash);
+            var res = await VerifyCard(args.Card);
             if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Card)
             {
                 return;
             }
             if (res)
             {
-                await host.SendResponseToTerminal(ResponseHeader.CardOk, CommandHeader.Card);
+                await host.SendResponseToTerminal(new byte[] { 0x00,0x01}, CommandHeader.Card);
             }
             else
             {
-                await host.SendResponseToTerminal(ResponseHeader.CardError, CommandHeader.Card);
+                await host.SendResponseToTerminal(new byte[] { 0x00, 0x00 }, CommandHeader.Card);
             }
         }
 
         private async void OnFingerCommandEvent(object sender, FingerCommandEventArgs args)
         {
-            var res = await VerifyFinger(args.Finger, args.Md5Hash);
+            var res = await VerifyFinger(args.Finger);
             if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Finger)
             {
                 return;
             }
             if (res)
             {
-                await host.SendResponseToTerminal(ResponseHeader.FingerOk,CommandHeader.Finger);
+                await host.SendResponseToTerminal(new byte[] { 0x00, 0x01 }, CommandHeader.Finger);
             }
             else{
-                await host.SendResponseToTerminal(ResponseHeader.FingerError, CommandHeader.Finger);
+                await host.SendResponseToTerminal(new byte[] { 0x00, 0x00 }, CommandHeader.Finger);
             }
         }
 
