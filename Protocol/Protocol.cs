@@ -14,60 +14,60 @@ namespace Protocol
                 HasCommandValue=true,
                 HasResponseHeader=true,
                 HasResponseValue=false,
-                IsControllerHosted=false,
-                IsHashable=true} },
+                DirectionTo=Direction.Controller,
+                HasCheckSum=true} },
             {CommandHeader.Ble,new Method{
                 CommandHeader=CommandHeader.Ble,
                 ResponseHeaders=new List<ResponseHeader>{ResponseHeader.BleOk,ResponseHeader.BleError},
                 HasCommandValue=true,
                 HasResponseValue=false,
                 HasResponseHeader=true,
-                IsControllerHosted=false,
-                IsHashable=true} },
+                DirectionTo=Direction.Controller,
+                HasCheckSum=true} },
             {CommandHeader.Finger,new Method{
                 CommandHeader=CommandHeader.Finger,
                 ResponseHeaders=new List<ResponseHeader>{ ResponseHeader.FingerOk, ResponseHeader.FingerError},
                 HasCommandValue=true,
                 HasResponseHeader=true,
                 HasResponseValue=false,
-                IsControllerHosted=false,
-                IsHashable=true} },
+                DirectionTo=Direction.Controller,
+                HasCheckSum=true} },
             {CommandHeader.FingerTimeout,new Method{
                 CommandHeader=CommandHeader.FingerTimeout,
                 HasResponseHeader=false,
                 HasResponseValue=false,
                 HasCommandValue=false,
-                IsControllerHosted=false,
-                IsHashable=false} },
+                DirectionTo=Direction.Controller,
+                HasCheckSum=true} },
             {CommandHeader.Error,new Method{
                 CommandHeader=CommandHeader.Error,
                 HasCommandValue=true,
                 HasResponseHeader=false,
                 HasResponseValue=false,
-                IsHashable=false,
-                IsControllerHosted=false,} },
+                HasCheckSum=true,
+                DirectionTo=Direction.Controller,} },
             {CommandHeader.Ota,new Method{
                 CommandHeader=CommandHeader.Ota,
                 HasResponseHeader=false,
                 HasResponseValue=true,
                 HasCommandValue=true,
-                IsControllerHosted=true,
-                IsHashable=true,} },
+                DirectionTo=Direction.Terminal,
+                HasCheckSum=true,} },
             {CommandHeader.WifiInit,new Method{
                 CommandHeader=CommandHeader.WifiInit,
                 HasCommandValue=true,
                 HasResponseHeader=true,
                 HasResponseValue=false,
-                IsControllerHosted=true,
+                DirectionTo=Direction.Terminal,
                 ResponseHeaders=new List<ResponseHeader>{ResponseHeader.WifiOk, ResponseHeader.WifiError},
-                IsHashable =false } },
+                HasCheckSum =true } },
             {CommandHeader.WifiSpots, new Method{
                 CommandHeader=CommandHeader.WifiSpots,
                 HasResponseHeader=false,
                 HasResponseValue=true,
                 HasCommandValue=false,
-                IsControllerHosted=true,
-                IsHashable=false} },
+                DirectionTo=Direction.Terminal,
+                HasCheckSum=true} },
             {CommandHeader.FingerWriteInBase, new Method{
                 CommandHeader=CommandHeader.FingerWriteInBase,
                 HasCommandValue=true,
@@ -75,61 +75,61 @@ namespace Protocol
                 HasResponseValue=false,
                 ResponseHeaders=new List<ResponseHeader>{ResponseHeader.FingerOk,ResponseHeader.FingerFail,
                     ResponseHeader.FingerFull,ResponseHeader.FingerExist },
-                IsControllerHosted=true,
-                IsHashable=false} },
+                DirectionTo=Direction.Terminal,
+                HasCheckSum=true} },
             {CommandHeader.FingerSetTimeout,new Method{
                 CommandHeader=CommandHeader.FingerSetTimeout,
                 HasCommandValue=true,
                 HasResponseHeader=true,
                 HasResponseValue=false,
-                IsControllerHosted=true,
+                DirectionTo=Direction.Terminal,
                 ResponseHeaders=new List<ResponseHeader>{ResponseHeader.FingerOk,ResponseHeader.FingerFail},
-                IsHashable=false} },
+                HasCheckSum=true} },
             {CommandHeader.FingerTimeoutCurrent, new Method{
                 CommandHeader=CommandHeader.FingerTimeoutCurrent,
                 HasCommandValue=false,
                 HasResponseHeader=false,
                 HasResponseValue=true,
-                IsControllerHosted=true,
-                IsHashable=false} },
+                DirectionTo=Direction.Terminal,
+                HasCheckSum=true} },
             {CommandHeader.FingerDeleteId, new Method{
                 CommandHeader=CommandHeader.FingerDeleteId,
                 HasCommandValue=true,
                 HasResponseHeader=true,
                 ResponseHeaders=new List<ResponseHeader>{ResponseHeader.FingerOk,ResponseHeader.FingerFail},
                 HasResponseValue=false,
-                IsControllerHosted=true,
-                IsHashable=false} },
+                DirectionTo=Direction.Terminal,
+                HasCheckSum=true} },
             {CommandHeader.FingerDeleteAll, new Method{
                 CommandHeader=CommandHeader.FingerDeleteAll,
                 HasCommandValue=false,
                 HasResponseHeader=true,
                 ResponseHeaders=new List<ResponseHeader>{ResponseHeader.FingerOk,ResponseHeader.FingerFail },
                 HasResponseValue=false,
-                IsControllerHosted=true,
-                IsHashable=false} },
+                DirectionTo=Direction.Terminal,
+                HasCheckSum=true} },
             {CommandHeader.TerminalConf,new Method{
                 CommandHeader=CommandHeader.TerminalConf,
                 HasCommandValue=true,
                 HasResponseHeader=true,
                 ResponseHeaders=new List<ResponseHeader>{ResponseHeader.TerminalOk,ResponseHeader.TerminalFail},
                 HasResponseValue=false,
-                IsControllerHosted=true,
-                IsHashable=false} },
+                DirectionTo=Direction.Terminal,
+                HasCheckSum=true} },
             {CommandHeader.TerminalReset,new Method{
                 CommandHeader=CommandHeader.TerminalReset,
                 HasCommandValue=true,
                 HasResponseHeader=false,
                 HasResponseValue=false,
-                IsControllerHosted=true,
-                IsHashable=false} },
+                DirectionTo=Direction.Terminal,
+                HasCheckSum=true} },
             {CommandHeader.Start,new Method{
                 CommandHeader=CommandHeader.Start,
                 HasCommandValue=true,
                 HasResponseHeader=false,
                 HasResponseValue=false,
-                IsControllerHosted=false,
-                IsHashable=false} }
+                DirectionTo=Direction.Controller,
+                HasCheckSum=true} }
         };
         public static CommandHeader GetCommandHeader(string command)
         {
@@ -177,7 +177,7 @@ namespace Protocol
         public static bool CheckReadyTerminalHosted(ExecutedMethod executedMethod)
         {
             bool ready = true;
-            if (!executedMethod.MethodInfo.IsControllerHosted)
+            if (!executedMethod.MethodInfo.DirectionTo)
             {
                 if (executedMethod.MethodInfo.HasCommandValue)
                 {
@@ -186,7 +186,7 @@ namespace Protocol
                         ready = false;
                     }
                 }
-                if (executedMethod.MethodInfo.IsHashable)
+                if (executedMethod.MethodInfo.HasCheckSum)
                 {
                     if (string.IsNullOrWhiteSpace(executedMethod.Hash))
                     {
@@ -201,7 +201,7 @@ namespace Protocol
         {
             bool ready = true;
             //return ready;
-            if (executedMethod.MethodInfo.IsControllerHosted)
+            if (executedMethod.MethodInfo.DirectionTo)
             {
                 if (executedMethod.MethodInfo.HasResponseHeader)
                 {

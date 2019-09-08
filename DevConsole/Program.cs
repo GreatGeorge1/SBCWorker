@@ -169,8 +169,8 @@ namespace DevConsole
                 HasCommandValue=input.HasCommandValue,
                 HasResponseHeader=input.HasResponseHeader,
                 HasResponseValue=input.HasResponseValue,
-                IsControllerHosted=input.IsControllerHosted,
-                IsHashable=input.IsHashable
+                DirectionTo=input.DirectionTo,
+                HasCheckSum=input.HasCheckSum
             };
             string responseHeaders = "";
             if(input.ResponseHeaders!=null && input.ResponseHeaders.Any())

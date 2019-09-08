@@ -11,7 +11,14 @@ namespace Protocol
         public bool HasResponseHeader { get; set; }
         public bool HasResponseValue { get; set; }
         public bool HasCommandValue { get; set; }
-        public bool IsHashable { get; set; }
-        public bool IsControllerHosted { get; set; }
+        public bool HasCheckSum { get; set; } = true;
+        public  Direction DirectionTo  { get; set; }
+    }
+
+    public enum Direction
+    {
+        NotSet,
+        Terminal,
+        Controller
     }
 }

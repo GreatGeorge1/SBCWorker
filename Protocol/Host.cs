@@ -151,7 +151,7 @@ namespace Protocol
             logger.LogInformation($"Executed method property changed: {args.PropertyName}");
             if (!executedMethod.IsFired)
             {
-                if (!executedMethod.MethodInfo.IsControllerHosted)
+                if (!executedMethod.MethodInfo.DirectionTo)
                 {
                     if (Protocol.CheckReadyTerminalHosted(executedMethod))
                     {
@@ -400,13 +400,13 @@ namespace Protocol
             {
                 if (executedMethod != null)
                 {
-                    if (!executedMethod.MethodInfo.IsControllerHosted)
+                    if (!executedMethod.MethodInfo.DirectionTo)
                     {
                         if (executedMethod.MethodInfo.HasCommandValue && string.IsNullOrWhiteSpace(executedMethod.CommandValue))
                         {
                             executedMethod.CommandValue = message;
                         }
-                        else if (executedMethod.MethodInfo.IsHashable && string.IsNullOrWhiteSpace(executedMethod.Hash))
+                        else if (executedMethod.MethodInfo.HasCheckSum && string.IsNullOrWhiteSpace(executedMethod.Hash))
                         {
                             executedMethod.Hash = message;
                         }
