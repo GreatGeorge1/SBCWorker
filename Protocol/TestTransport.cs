@@ -13,6 +13,7 @@ namespace Protocol
         }
 
         public MessageQueue<string> InputQueue { get; set; }
+        public MessageQueue<string> OutputQueue { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public bool Init()
         {

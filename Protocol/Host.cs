@@ -164,12 +164,9 @@ namespace Protocol
             bool dequeue = transport.InputQueue.TryDequeue(out input);
             if (input!=null && input.Length>0)
             {
-                // ProcessMessage(input);
-                ExecutedMethod method;
-                MessageType mtype;
-
-                var res = RequestMiddleware.Process(input, out method, out _, out mtype);
-                Console.WriteLine($"message type: {mtype.ToString()}");
+                Message message;
+                var res = RequestMiddleware.Process(input, out message);
+                Console.WriteLine($"message type: {message.Type.ToString()}");
                 Console.WriteLine($"message type: {res.ToString()}");
                 // logger.LogWarning($"message type: {method.MethodInfo.CommandHeader.GetDisplayName()}");
                 if (res)
@@ -178,18 +175,26 @@ namespace Protocol
                     {
                         if (executedMethod.IsCompleted)
                         {
-                            if (mtype == MessageType.REQ)
+                            if (message.Type == MessageType.REQ)
                             {
-                                ExecuteMethod(method);
+                                ExecuteMethod(message.Method.CommandHeader);
+                                if (message.Method.HasCommandValue)
+                                {
+                                    executedMethod.CommandValue = message.Value;
+                                }
                             }
                         }
                         else
                         {
-                            switch (mtype)
+                            switch (message.Type)
                             {
                                 case MessageType.REQ:
-                                    logger.LogWarning($"Interrupted method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
-                                    ExecuteMethod(method);
+                                    logger.LogWarning($"Interrupted method: {executedMethod.MethodInfo.CommandHeader}");
+                                    ExecuteMethod(message.Method.CommandHeader);
+                                    if (message.Method.HasCommandValue)
+                                    {
+                                        executedMethod.CommandValue = message.Value;
+                                    }
                                     break;
                                 case MessageType.RES:
                                     //executedMethod.Re
@@ -207,7 +212,11 @@ namespace Protocol
                     {
                         // if (mtype==MessageType.REQ)
                         //{
-                        ExecuteMethod(method);
+                        ExecuteMethod(message.Method.CommandHeader);
+                        if (message.Method.HasCommandValue)
+                        {
+                            executedMethod.CommandValue = message.Value;
+                        }
                         //}
                     }
                 }

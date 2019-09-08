@@ -8,13 +8,14 @@ namespace Protocol
 {
     public static class RequestMiddleware
     {
-        public static bool Process(byte[] message, out ExecutedMethod executedMethod, out byte checksum, out MessageType mtype)
+        public static bool Process(byte[] message, out Message resMsg)
         {
-            executedMethod = new ExecutedMethod();
+             var executedMethod = new ExecutedMethod();
             message=message.TakeWhile(x => !(x.Equals(0x0D))).ToArray();
             if (IsValid(message))
             {
-               // message = message.SkipLast(n).ToArray();
+                // message = message.SkipLast(n).ToArray();
+                MessageType mtype = MessageType.NotSet;
                 if(IsValidType(message, out mtype))
                 {
                     CommandHeader command;
@@ -23,18 +24,18 @@ namespace Protocol
                         Method methodInfo;
                         Protocol.Static.GetMethods().TryGetValue(command, out methodInfo);
                         executedMethod.MethodInfo = methodInfo;
-                        if(IsValidCheckSum(message, out checksum))
+                        if(IsValidCheckSum(message, out _))
                         {
                             var value = message.Skip(4).Take(message[3]).ToArray();
                           //  var strValue = Encoding.ASCII.GetString(value);
                             executedMethod.CommandValue = value;
+                            resMsg = new Message(methodInfo, value, mtype);
                             return true;
                         } 
                     }
                 }
             }
-            mtype = MessageType.NotSet;
-            checksum = new byte();
+            resMsg = null;
             return false;
         }
         public static bool IsValid(byte[] message)
@@ -118,6 +119,19 @@ namespace Protocol
                 _CheckSumByte ^= _PacketData[i];
 
             return _CheckSumByte;
+        }
+    }
+
+    public class Message
+    {
+        public Method Method { get; private set; }
+        public byte[] Value { get; private set; }
+        public MessageType Type { get; private set; }
+        public Message(Method method, byte[] value, MessageType mtype)
+        {
+            Method = method;
+            Value = value;
+            Type = mtype;
         }
     }
 

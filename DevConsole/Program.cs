@@ -87,18 +87,18 @@ namespace DevConsole
 
             Console.WriteLine(StringByte);
 
-            ExecutedMethod method;
+            Message message1;
             byte checksum;
            // var test = $"{Encoding.ASCII.GetString(message)}";
            // var test2 = Encoding.ASCII.GetBytes(test);
             Console.WriteLine(Encoding.Default.GetString(arr));
-            var res =RequestMiddleware.Process(arr, out method, out checksum, out _);
+            var res =RequestMiddleware.Process(arr, out message1);
          //   var list2 = new List<ProtocolMethodView>();
 
             //list2.Add(ProtocolMethodView.MapProtocolMethod(method.MethodInfo));
 
             //ConsoleTableBuilder.From(list2).WithFormat(ConsoleTableBuilderFormat.Minimal).ExportAndWriteLine();
-            log.Information($"checksum {checksum.ToString()}");
+          //  log.Information($"checksum {checksum.ToString()}");
             log.Information($"res {res.ToString()}");
             var cardbytes = message.Skip(4).Take(8).ToArray();
 
@@ -160,7 +160,6 @@ namespace DevConsole
 
     class ProtocolMethodView : Protocol.Method
     {
-        public new string ResponseHeaders { get; set; }
         public static ProtocolMethodView MapProtocolMethod(Protocol.Method input)
         {
             var res = new ProtocolMethodView
@@ -170,7 +169,7 @@ namespace DevConsole
                 HasResponseValue=input.HasResponseValue,
                 DirectionTo=input.DirectionTo,
             };
-            string responseHeaders = "";
+          
 
             return res;
         }

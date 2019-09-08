@@ -18,6 +18,7 @@ namespace Worker.Host.Transports
         private SerialPort stream;
         private ILogger logger { get; set; }
         public MessageQueue<byte[]> InputQueue { get; set; }
+        public MessageQueue<byte[]> OutputQueue { get; set; }
 
         public SerialPortTransport(SerialConfig port, ILogger logger = null)
         {
@@ -161,6 +162,7 @@ namespace Worker.Host.Transports
                     }
                    // stream.Write(message);
                     stream.Write(message, 0, message.Length);
+                   
                     if (port.IsRS485)
                     {
                         await Task.Delay(50);

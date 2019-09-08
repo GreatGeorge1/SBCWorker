@@ -29,16 +29,6 @@ namespace Protocol
                 OnPropertyChanged("ResponseValue");
             }
         }
-        private byte checkSum;
-        public byte CheckSum
-        {
-            get { return checkSum; }
-            set
-            {
-                checkSum = value;
-                OnPropertyChanged("CheckSum");
-            }
-        }
         private bool isFired;
         public bool IsFired
         {
