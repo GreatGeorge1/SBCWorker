@@ -21,14 +21,6 @@ namespace DevConsole
             .CreateLogger();
         static async Task Main(string[] args)
         {
-            //DataTable data = new DataTable();
-            //data.Columns.Add("CommandHeader", typeof(ProtocolCommands));
-            //data.Columns.Add("ResponseHeaders", typeof(ICollection<ProtocolResponse>));
-            //data.Columns.Add("HasResponseHeader", typeof(bool));
-            //data.Columns.Add("HasResponseValue", typeof(bool));
-            //data.Columns.Add("HasCommandValue", typeof(bool));
-            //data.Columns.Add("IsHashable", typeof(bool));
-            //data.Columns.Add("IsControllerHosted", typeof(bool));
             var list = new List<ProtocolMethodView>();
             foreach(var item in Protocol.Static.GetMethods())
             {
@@ -71,13 +63,7 @@ namespace DevConsole
             List<byte> list2 = new List<byte>();
             foreach (string hex in hexValuesSplit)
             {
-                // Convert the number expressed in base-16 to an integer.
                 int value = Convert.ToInt32(hex, 16);
-                // Get the character corresponding to the integral value.
-                // string stringValue = Char.ConvertFromUtf32(value);
-                //char charValue = (char)value;
-                //Console.WriteLine("hexadecimal value = {0}, int value = {1}, char value = {2} or {3}",
-                //                  hex, value, stringValue, charValue);
                 list2.Add((byte)value);
             }
             var arr = list2.ToArray();
@@ -89,31 +75,15 @@ namespace DevConsole
 
             Message message1;
             byte checksum;
-           // var test = $"{Encoding.ASCII.GetString(message)}";
-           // var test2 = Encoding.ASCII.GetBytes(test);
+
             Console.WriteLine(Encoding.Default.GetString(arr));
             var res =RequestMiddleware.Process(arr, out message1);
-         //   var list2 = new List<ProtocolMethodView>();
 
-            //list2.Add(ProtocolMethodView.MapProtocolMethod(method.MethodInfo));
-
-            //ConsoleTableBuilder.From(list2).WithFormat(ConsoleTableBuilderFormat.Minimal).ExportAndWriteLine();
-          //  log.Information($"checksum {checksum.ToString()}");
             log.Information($"res {res.ToString()}");
             var cardbytes = message.Skip(4).Take(8).ToArray();
 
             var ts = new TestTransport();
-        //    var host = new Host(ts);
-           // await ts.WriteMessageAsync(msg);
-         //   await Task.Delay(1000);
-        //    await ts.WriteMessageAsync(msg);
-         //   await Task.Delay(1000);
-        //    await ts.WriteMessageAsync(msg);
-        //    await Task.Delay(1000);
-         //   await ts.WriteMessageAsync(msg);
-         //   await Task.Delay(1000);
-         //   await ts.WriteMessageAsync(msg);
-         //   await Task.Delay(1000);
+
         }
         public static void EnqueueAction(object sender, MessageQueueEnqueueEventArgs<string> e)
         {

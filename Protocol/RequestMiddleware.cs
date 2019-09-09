@@ -10,41 +10,37 @@ namespace Protocol
     {
         public static bool Process(byte[] message, out Message resMsg)
         {
-             var executedMethod = new ExecutedMethod();
-            message=message.TakeWhile(x => !(x.Equals(0x0D))).ToArray();
+            var executedMethod = new ExecutedMethod();
+            message = message.TakeWhile(x => !(x.Equals(0x0D)) && !(x.Equals(0x0A))).ToArray();
             if (IsValid(message))
             {
-                // message = message.SkipLast(n).ToArray();
                 MessageType mtype = MessageType.NotSet;
-                if(IsValidType(message, out mtype))
+                if (IsValidType(message, out mtype))
                 {
                     CommandHeader command;
-                    if(IsValidCommand(message, out command))
+                    if (IsValidCommand(message, out command))
                     {
                         Method methodInfo;
                         Protocol.Static.GetMethods().TryGetValue(command, out methodInfo);
                         executedMethod.MethodInfo = methodInfo;
-                        if(IsValidCheckSum(message, out _))
+                        if (IsValidCheckSum(message, out _))
                         {
                             var value = message.Skip(4).Take(message[3]).ToArray();
-                          //  var strValue = Encoding.ASCII.GetString(value);
+                            //  var strValue = Encoding.ASCII.GetString(value);
                             executedMethod.CommandValue = value;
                             resMsg = new Message(methodInfo, value, mtype);
                             return true;
-                        } 
+                        }
                     }
                 }
             }
             resMsg = null;
             return false;
         }
-        public static bool IsValid(byte[] message)
+        
+        private static bool IsValid(byte[] message)
         {
             int k = 0;
-
-            Debug.Assert(message[0] == 0x02);
-            Debug.Assert(message[message.Length - 1] == 0x03);
-
             if (message[0] ==0x02)
             {
                 k++;
@@ -62,10 +58,9 @@ namespace Protocol
             return false;
         }
 
-        public static bool IsValidType(byte[] message, out MessageType mtype)
+        private static bool IsValidType(byte[] message, out MessageType mtype)
         {
             var temp = message[1];
-           // Debug.Assert(message[1] == 0xd5);
             mtype = MessageType.NotSet;
             foreach (var item in Enum.GetValues(typeof(MessageType)))
             {
@@ -78,10 +73,9 @@ namespace Protocol
             return false;
         }
 
-        public static bool IsValidCommand(byte[] message, out CommandHeader command)
+        private static bool IsValidCommand(byte[] message, out CommandHeader command)
         {
             var temp = message[2];
-           // Debug.Assert(message[2] == 0xC7);
             command = CommandHeader.NotSet;
             foreach(var item in Enum.GetValues(typeof(CommandHeader)))
             {
@@ -94,25 +88,28 @@ namespace Protocol
             return false;
         }
 
-        public static bool IsValidCheckSum(byte[] message, out byte newChecksum)
+        private static bool IsValidCheckSum(byte[] message, out byte newChecksum)
         {
-            var temp = message[3];
-            var bytes = message.Skip(4).Take(temp).ToArray();
-            var checksum = message.Skip(4 + (int)temp).SkipLast(1).First();
-            //Debug.Assert(checksum == 0x0B);
-            Console.WriteLine(checksum.ToString());
-            newChecksum = CalCheckSum(bytes, bytes.Length);
-            Console.WriteLine(newChecksum.ToString());
-            Debug.Assert(checksum == newChecksum);
-            if (checksum == newChecksum)
+            try
             {
-                return true;
+                var temp = message[3];
+                var bytes = message.Skip(4).Take(temp).ToArray();
+                var checksum = message.Skip(4 + (int) temp).SkipLast(1).First();
+                newChecksum = CalCheckSum(bytes, bytes.Length);
+                if (checksum == newChecksum)
+                {
+                    return true;
+                }
             }
-            return false;
+            catch (Exception e)
+            {
 
+            }
+            newChecksum = 0x00; 
+            return false;
         }
 
-        public static byte CalCheckSum(byte[] _PacketData, int PacketLength)
+        private static byte CalCheckSum(byte[] _PacketData, int PacketLength)
         {
             Byte _CheckSumByte = 0x00;
             for (int i = 0; i < PacketLength; i++)

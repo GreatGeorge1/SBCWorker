@@ -4,9 +4,6 @@ using Protocol.Events;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Globalization;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,7 +11,7 @@ namespace Protocol
 {
     public interface IHost
     {
-
+        Task ExecuteAsync(CancellationToken stoppingToken);
     }
 
     public class Host : IHost
@@ -56,8 +53,8 @@ namespace Protocol
 
         public ExecutedMethod ExecutedMethod
         {
-            get { return executedMethod; }
-            set { executedMethod = value; }
+            get => executedMethod;
+            set => executedMethod = value;
         }
 
 
@@ -105,7 +102,7 @@ namespace Protocol
 
 
 
-        private async Task ProcessControllerMethodAsync()
+        private async Task<bool> ProcessControllerMethodAsync()
         {
             switch (executedMethod.MethodInfo.CommandHeader)
             {
@@ -116,13 +113,14 @@ namespace Protocol
                     while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
-                       // await transport.WriteMessageAsync(Protocol.CreateCommand(CommandHeader.FingerTimeoutCurrent));
+                        //await transport.WriteMessageAsync(Protocol.CreateCommand(CommandHeader.FingerTimeoutCurrent));
                         executedMethod.RepeatCount++;
                         await Task.Delay(200);
                     }
-                    //  return result;
+                    return true;
                     break;
             }
+            return false;
         }
         #region protocol host events
         public delegate void CardCommandEventHandler(object sender, CardCommandEventArgs e);
@@ -151,9 +149,20 @@ namespace Protocol
             logger.LogInformation($"Executed method property changed: {args.PropertyName}");
             if (!executedMethod.IsFired)
             {
-                
+                var direction = executedMethod.MethodInfo.DirectionTo;
+                if (executedMethod.MethodInfo.HasCommandValue)
+                {
+                    if(executedMethod.CommandValue!=null && executedMethod.CommandValue.Length > 0)
+                    {
                         executedMethod.IsFired = true;
-                        //ProcessTerminalMethodAsync();
+                        _=(direction == Direction.Controller) ? ProcessTerminalMethodAsync() : await ProcessControllerMethodAsync().ConfigureAwait(false);
+                    };
+                }
+                else
+                {
+                    executedMethod.IsFired = true;
+                    _ = (direction == Direction.Controller) ? ProcessTerminalMethodAsync() : await ProcessControllerMethodAsync().ConfigureAwait(false);
+                }
              
             }
         }
@@ -168,56 +177,52 @@ namespace Protocol
                 var res = RequestMiddleware.Process(input, out message);
                 Console.WriteLine($"message type: {message.Type.ToString()}");
                 Console.WriteLine($"message type: {res.ToString()}");
-                // logger.LogWarning($"message type: {method.MethodInfo.CommandHeader.GetDisplayName()}");
                 if (res)
                 {
+                    if (executedMethod == null)
+                    {
+                        if (message.Type == MessageType.REQ)
+                        {
+                            ExecuteMethod(message.Method.CommandHeader);
+                            if (message.Method.HasCommandValue)
+                            {
+                                executedMethod.CommandValue = message.Value;
+                            }
+                        }
+                        else
+                        {
+                            logger.LogWarning("Protocol flow error: executedMethod is null");
+                        }
+                    }
                     if (executedMethod != null)
                     {
-                        if (executedMethod.IsCompleted)
+                        if (message.Method.CommandHeader != executedMethod.MethodInfo.CommandHeader && message.Type != MessageType.REQ)
                         {
-                            if (message.Type == MessageType.REQ)
-                            {
+                            logger.LogWarning("Protocol flow warning: CommandHeader");
+                            return;
+                        }
+                        switch (message.Type)
+                        {
+                            case MessageType.ACK:
+                                executedMethod.IsCompleted = true;
+                                break;
+                            case MessageType.NACK:
+                                executedMethod.PushError(message.Value);     
+                                break;
+                            case MessageType.RES:
+                                executedMethod.ResponseValue = message.Value;
+                                break;
+                            case MessageType.REQ:
                                 ExecuteMethod(message.Method.CommandHeader);
                                 if (message.Method.HasCommandValue)
                                 {
                                     executedMethod.CommandValue = message.Value;
                                 }
-                            }
+                                break;                            
+                            default:
+                                logger.LogWarning("Protocol flow error: MessageType");
+                                break;
                         }
-                        else
-                        {
-                            switch (message.Type)
-                            {
-                                case MessageType.REQ:
-                                    logger.LogWarning($"Interrupted method: {executedMethod.MethodInfo.CommandHeader}");
-                                    ExecuteMethod(message.Method.CommandHeader);
-                                    if (message.Method.HasCommandValue)
-                                    {
-                                        executedMethod.CommandValue = message.Value;
-                                    }
-                                    break;
-                                case MessageType.RES:
-                                    //executedMethod.Re
-                                    break;
-                                case MessageType.ACK:
-                                    executedMethod.IsCompleted = true;
-                                    break;
-                                default: break;
-                            }
-
-
-                        }
-                    }
-                    else
-                    {
-                        // if (mtype==MessageType.REQ)
-                        //{
-                        ExecuteMethod(message.Method.CommandHeader);
-                        if (message.Method.HasCommandValue)
-                        {
-                            executedMethod.CommandValue = message.Value;
-                        }
-                        //}
                     }
                 }
                 else
@@ -233,18 +238,22 @@ namespace Protocol
         }
 
         #endregion
-        private void ProcessTerminalMethodAsync()
+
+        private bool ProcessTerminalMethodAsync()
         {
             switch (executedMethod.MethodInfo.CommandHeader)
             {
                 case CommandHeader.Card:
                     PushCardCommandEvent(executedMethod.CommandValue);
+                    return true;
                     break;
                 case CommandHeader.Finger:
                     PushFingerCommandEvent(executedMethod.CommandValue);
+                    return true;
                     break;
                     //case ProtocolCommands.
             }
+            return false;
         }
 
 

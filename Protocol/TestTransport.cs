@@ -5,15 +5,15 @@ using System.Threading.Tasks;
 
 namespace Protocol
 {
-    public class TestTransport : ITransport
+    public class TestTransport : IByteTransport
     {
         public TestTransport()
         {
-            InputQueue = new MessageQueue<string>();
+            InputQueue = new MessageQueue<byte[]>();
         }
 
-        public MessageQueue<string> InputQueue { get; set; }
-        public MessageQueue<string> OutputQueue { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public MessageQueue<byte[]> InputQueue { get; set; }
+        public MessageQueue<byte[]> OutputQueue { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public bool Init()
         {
@@ -26,7 +26,7 @@ namespace Protocol
             throw new NotImplementedException();
         }
 
-        public async Task<bool> WriteMessageAsync(string input)
+        public async Task<bool> WriteMessageAsync(byte[] input)
         {
             InputQueue.Enqueue(input);
             return true;

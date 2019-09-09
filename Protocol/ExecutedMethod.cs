@@ -42,6 +42,8 @@ namespace Protocol
             set { isCompleted = value; OnPropertyChanged("IsCompleted"); }
         }
 
+
+        private List<byte[]> errors;
         public bool IsError { get; set; }
 
         private int repeatCount;
@@ -49,6 +51,8 @@ namespace Protocol
         public ExecutedMethod()
         {
             repeatCount = 0;
+            errors = new List<byte[]>();
+            OnPropertyChanged("Init");
         }
 
         public int RepeatCount
@@ -58,6 +62,12 @@ namespace Protocol
         }
 
         public int RepeatLimit { get; set; }
+
+        public void PushError(byte[] value)
+        {
+            IsError = true;
+            errors.Add(value);
+        }
 
         private void ValidateLimit(int count)
         {
