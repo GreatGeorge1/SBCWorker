@@ -34,7 +34,7 @@ namespace Protocol
                     }
                 }
             }
-            resMsg = null;
+            resMsg = new Message(new Method(),new byte[0] { }, MessageType.NotSet);
             return false;
         }
         
@@ -109,7 +109,7 @@ namespace Protocol
             return false;
         }
 
-        private static byte CalCheckSum(byte[] _PacketData, int PacketLength)
+        public static byte CalCheckSum(byte[] _PacketData, int PacketLength)
         {
             Byte _CheckSumByte = 0x00;
             for (int i = 0; i < PacketLength; i++)

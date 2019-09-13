@@ -61,7 +61,7 @@ namespace Protocol
         public async Task<bool> SendResponseToTerminal(byte[] result, CommandHeader command)
         {
             executedMethod.ResponseValue = result;
-            var response = executedMethod.CreateResponse();
+            var response = executedMethod.CreateResponse(result);
             var res = false;
             while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == command)
             {
@@ -100,20 +100,36 @@ namespace Protocol
             Console.WriteLine($"ExecuteMethod hit:{method.MethodInfo.CommandHeader.GetDisplayName()}");
         }
 
-
+        public async Task ExecuteControllerMethodAsync(CommandHeader header, byte[] value)
+        {
+            if(executedMethod is null)
+            {
+                ExecuteMethod(header);
+                executedMethod.CommandValue = value;
+                await ProcessControllerMethodAsync();
+            }
+            else
+            {
+                while(executedMethod.IsCompleted != true)
+                {
+                    await Task.Delay(50);
+                }
+                ExecuteMethod(header);
+                executedMethod.CommandValue = value;
+                await ProcessControllerMethodAsync();
+            }
+        }
 
         private async Task<bool> ProcessControllerMethodAsync()
         {
             switch (executedMethod.MethodInfo.CommandHeader)
             {
                 case CommandHeader.FingerTimeoutCurrent:
-                    // executedMethod.ResponseHeader = header;
-                    //var response = executedMethod.CreateResponse();
-                    //var result = false;
+                   
                     while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
-                        //await transport.WriteMessageAsync(Protocol.CreateCommand(CommandHeader.FingerTimeoutCurrent));
+                        await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,(byte)CommandHeader.FingerTimeoutCurrent, 0x02,0x00,0x01,0x01,0x03,0x0d,0x0a});
                         executedMethod.RepeatCount++;
                         await Task.Delay(200);
                     }
@@ -135,6 +151,14 @@ namespace Protocol
         public void PushFingerCommandEvent(byte[] finger)
         {
             FingerCommandEvent?.Invoke(this, new FingerCommandEventArgs(finger));
+        }
+
+        public delegate void BleCommandEventHandler(object sender, BleCommandEventArgs e);
+        public event BleCommandEventHandler BleCommandEvent;
+
+        public void PushBleCommandEvent(byte[] ble)
+        {
+            BleCommandEvent?.Invoke(this, new BleCommandEventArgs(ble));
         }
 
         protected void OnExecuteMethodRepeatReachedLimit(object sender, RepeatCountReachedLimitArgs args)
@@ -249,6 +273,10 @@ namespace Protocol
                     break;
                 case CommandHeader.Finger:
                     PushFingerCommandEvent(executedMethod.CommandValue);
+                    return true;
+                    break;
+                case CommandHeader.Ble:
+                    PushBleCommandEvent(executedMethod.CommandValue);
                     return true;
                     break;
                     //case ProtocolCommands.

@@ -102,15 +102,24 @@ namespace Protocol
             }
         }
 
-        public byte[] CreateResponse()
+        public byte[] CreateResponse(byte[] result)
         {
-            //var command = this.ResponseHeader;
-            //TODO implement
-            //return $"{command.GetDisplayName()}\r\n";
-            byte[] msg = { 0x02, 0xD6, 0xC7, 0x00, 0x01, 0x01, 0x03, 0x0d,0x0a };
+            var list = new List<byte>();
+            list.Add(0x02);
+            list.Add((byte)MessageType.RES);
+            list.Add((byte)this.MethodInfo.CommandHeader);
+            list.Add((byte)result.Length);
+            foreach(var item in result)
+            {
+                list.Add(item);
+            }
+            list.Add(RequestMiddleware.CalCheckSum(result, result.Length));
+            list.Add(0x03);
+            list.Add(0x0d);
+            list.Add(0x0a);
+           // byte[] msg = { 0x02, 0xD6, 0xC7, 0x02, 0x00, 0x01, 0x01, 0x03, 0x0d,0x0a };
 
-            //return $"{Encoding.ASCII.GetString(msg)}\r\n";
-            return msg;
+            return list.ToArray();
         }
     }
 }

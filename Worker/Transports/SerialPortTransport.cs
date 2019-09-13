@@ -20,9 +20,12 @@ namespace Worker.Host.Transports
         public MessageQueue<byte[]> InputQueue { get; set; }
         public MessageQueue<byte[]> OutputQueue { get; set; }
 
+        private bool serial_read = false;
         public SerialPortTransport(SerialConfig port, ILogger logger = null)
         {
             InputQueue = new MessageQueue<byte[]>();
+            OutputQueue=new MessageQueue<byte[]>();
+            OutputQueue.EnqueueEvent += EnqueueOutputMessageAction;
             this.port = port ?? throw new ArgumentNullException(nameof(port));
             if (logger != null)
             {
@@ -88,6 +91,11 @@ namespace Worker.Host.Transports
             return true;
         }
 
+        private async void EnqueueOutputMessageAction(object sender, MessageQueueEnqueueEventArgs<byte[]> args)
+        {
+            var msg=OutputQueue.Dequeue();
+            await WriteMessageAsync(msg);
+        }
         private void PinChangedAction(object sender, SerialPinChangedEventArgs e)
         {
             logger.LogInformation($"Port {port.PortName} pin changed: {e.ToString()}");
@@ -111,26 +119,30 @@ namespace Worker.Host.Transports
         {
             try
             {
+                if (serial_read)
+                {
+                    return;
+                }
+                serial_read = true;
                 do
                 {
                     await Task.Delay(100);
                     var bytes = new List<byte>();
-                    byte r = 0x0d;//'\r'
-                    byte n = 0x0a;//'\n'
+                    byte r = 0x0d; //'\r'
+                    byte n = 0x0a; //'\n'
                     byte temp;
                     do
                     {
                         var _byte = stream.ReadByte();
-                        temp = (byte)_byte;
-                        if(temp != r && temp != n)
+                        temp = (byte) _byte;
+                        if (temp != r && temp != n)
                         {
-                            bytes.Add((byte)_byte);
+                            bytes.Add((byte) _byte);
                         }
-                    }
-                    while (stream.BytesToRead > 0 && !(temp == r || temp==n));
+                    } while (stream.BytesToRead > 0 && !(temp == r || temp == n));
                     var res = bytes.ToArray();
                     string str = BitConverter.ToString(res);
-                    Console.WriteLine(str);       
+                    Console.WriteLine(str);
                     InputQueue.Enqueue(res);
                 } while (stream.RtsEnable == true);
             }
@@ -146,6 +158,7 @@ namespace Worker.Host.Transports
             {
                 logger.LogWarning(ex.ToString());
             }
+            serial_read = false;
             return;
         }
 
@@ -155,6 +168,10 @@ namespace Worker.Host.Transports
             {
                 try
                 {
+                    while (serial_read)
+                    {
+                        await Task.Delay(50);
+                    }
                     if (port.IsRS485)
                     {
                         stream.RtsEnable = false;

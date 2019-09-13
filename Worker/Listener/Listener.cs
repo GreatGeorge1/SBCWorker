@@ -37,6 +37,7 @@ namespace Worker.Host
             this.host = new Protocol.Host(new SerialPortTransport(port, logger));
             host.CardCommandEvent += OnCardCommandEvent;
             host.FingerCommandEvent += OnFingerCommandEvent;
+            host.BleCommandEvent += OnBleCommandEvent;
 
             this.inputQueue = inputQueue;
             inputQueue.EnqueueEvent += OnSignalRMessage;
@@ -53,7 +54,8 @@ namespace Worker.Host
             switch(args.Item.Method){
                 case SignalRMethod.GetFingerTimeoutCurrent:
                     Console.WriteLine("OnSignalRMessage GetFingerTimeoutCurrent HIT");
-                  //  host.ProcessMessage(CommandHeader.FingerTimeoutCurrent.GetDisplayName());
+                   
+                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerTimeoutCurrent, new byte[] { });
                     break;
                 default:Console.WriteLine("OnSignalRMessage UNexpected");
                     break;
@@ -91,6 +93,15 @@ namespace Worker.Host
             else{
                 await host.SendResponseToTerminal(new byte[] { 0x00, 0x00 }, CommandHeader.Finger);
             }
+        }
+
+        private async void OnBleCommandEvent(object sender, BleCommandEventArgs args)
+        {
+            if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Ble)
+            {
+                return;
+            }
+            await host.SendResponseToTerminal(new byte[] { 0x00, 0x01 }, CommandHeader.Ble);
         }
 
         public Task ExecuteAsync(CancellationToken ct)
