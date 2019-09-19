@@ -12,16 +12,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Worker.Host.Models;
+using Worker.Models;
 
 namespace Worker.Host.SignalR
 {
     public class ServerSignalRClient
     {
-        private const string Domain = "https://dev-3ru57p69.eu.auth0.com/";
-        private const string Audience = "https://localhost:5001";
-        private const string Secret = "idcNqrPsARQFI5qeEKOn57SwsloVN-ln1bo-R7aTo_ZTWtnEv2BGAkbuTvm7hq8J";
-        private const string ClientId = "DYaPShg0nOEptG3AIeDgNBCudk7w3LhI";
-        private const string ConnectionUri = "https://aa1c1efb.ngrok.io/hubs/controllerhub";
+        private string Domain = "https://dev-3ru57p69.eu.auth0.com/";
+        private string Audience = "https://localhost:5001";
+        private string Secret = "idcNqrPsARQFI5qeEKOn57SwsloVN-ln1bo-R7aTo_ZTWtnEv2BGAkbuTvm7hq8J";
+        private string ClientId = "DYaPShg0nOEptG3AIeDgNBCudk7w3LhI";
+        private string ConnectionUri = "https://aa1c1efb.ngrok.io/hubs/controllerhub";
 
         private string token = null;
         private SecurityToken validatedToken = null;
@@ -32,8 +33,17 @@ namespace Worker.Host.SignalR
         private readonly HubConnection connection;
         public HubConnection Connection { get => connection; private set { return; } }
 
-        public ServerSignalRClient()
+        public ServerSignalRClient(SignalROptions options)
         {
+            if(!(options is null))
+            {
+                Domain = options.AuthDomain;
+                Audience = options.Audience;
+                Secret = options.Secret;
+                ClientId = options.Id;
+                ConnectionUri = options.HubUri;
+            }
+
             configurationManager =
                 new ConfigurationManager<OpenIdConnectConfiguration>
                     ($"{Domain}.well-known/openid-configuration",

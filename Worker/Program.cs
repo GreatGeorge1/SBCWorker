@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Worker.EntityFrameworkCore;
+using Worker.Host.SignalR;
 using Worker.Models;
 
 namespace Worker.Host
@@ -58,12 +59,17 @@ namespace Worker.Host
                 });
                 services.AddSingleton<ListenerFactory>();
                 services.Configure<WorkerOptions>(config);
+               // services.Configure<SignalROptions>(config);
                 var options = new WorkerOptions();
+                var opt = new SignalROptions();
+                config.GetSection("SignalROptions").Bind(opt);
+                services.AddSingleton(opt);
                 config.GetSection("ListenerOptions").Bind(options);
                 foreach (var port in options.Ports)
                 {
                     services.AddSingleton(new SerialConfig(port.PortName,port.IsRS485));
                 }
+                services.AddSingleton<ServerSignalRClient>();
                 services.AddHostedService<ListenerHost>();
 
             }).Build();

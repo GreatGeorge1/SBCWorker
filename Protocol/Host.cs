@@ -235,6 +235,11 @@ namespace Protocol
                                 break;
                             case MessageType.RES:
                                 executedMethod.ResponseValue = message.Value;
+                                ///TODO validation
+                                if (executedMethod.MethodInfo.DirectionTo == Direction.Terminal)
+                                {
+                                    executedMethod.IsCompleted = true;
+                                }
                                 break;
                             case MessageType.REQ:
                                 ExecuteMethod(message.Method.CommandHeader);

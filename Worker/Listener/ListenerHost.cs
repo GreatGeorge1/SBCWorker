@@ -24,12 +24,12 @@ namespace Worker.Host
         private readonly MessageQueue<SignalRMessage> outputQueue;
         private readonly ServerSignalRClient client;
 
-        public ListenerHost(ILogger<ListenerHost> logger, IEnumerable<SerialConfig> ports,ListenerFactory factory)
+        public ListenerHost(ILogger<ListenerHost> logger, IEnumerable<SerialConfig> ports,ListenerFactory factory, ServerSignalRClient client)
         {
             _logger = logger;
             _ports = ports;
             _factory = factory;
-            client = new ServerSignalRClient();
+            this.client = client;
             inputQueue = new MessageQueue<SignalRMessage>();
             outputQueue = new MessageQueue<SignalRMessage>();
         }
