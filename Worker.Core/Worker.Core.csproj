@@ -5,13 +5,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.ComponentModel.Annotations" Version="4.6.0-rc1.19456.4" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="4.6.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="System.ComponentModel.Annotations">
-      <HintPath>C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\3.0.0-preview5-27626-15\ref\netcoreapp3.0\System.ComponentModel.Annotations.dll</HintPath>
-    </Reference>
-  </ItemGroup>
+
 
 </Project>
