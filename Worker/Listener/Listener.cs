@@ -53,9 +53,12 @@ namespace Worker.Host
             var item = inputQueue.Dequeue();//govno
             switch(args.Item.Method){
                 case SignalRMethod.GetFingerTimeoutCurrent:
-                    Console.WriteLine("OnSignalRMessage GetFingerTimeoutCurrent HIT");
-                   
+                    Console.WriteLine("OnSignalRMessage GetFingerTimeoutCurrent HIT");       
                     await host.ExecuteControllerMethodAsync(CommandHeader.FingerTimeoutCurrent, new byte[] { });
+                    break;
+                case SignalRMethod.AddFinger:
+                    Console.WriteLine("OnSignalRMessage AddFinger HIT");
+                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)args.Item.Uid, (byte)args.Item.Privilage });
                     break;
                 default:Console.WriteLine("OnSignalRMessage UNexpected");
                     break;

@@ -46,10 +46,20 @@ namespace Worker.Host
                     Console.WriteLine("SignalR GetFingerTimeoutCurrent HIT!");
                     inputQueue.Enqueue(new SignalRMessage { Port = port1, Method = SignalRMethod.GetFingerTimeoutCurrent });
                 });
+
+                client.Connection.On<int, int>("AddFinger", (uid, privilage) => 
+                {
+                    Console.WriteLine("SignalR AddFinger HIT!");
+                    Console.WriteLine($"uid: '{uid}', privilage: '{privilage}'");
+                    inputQueue.Enqueue(new SignalRMessage { Method = SignalRMethod.AddFinger, Uid=uid, Privilage=privilage  });
+                });
+
                 client.Connection.On<int>("SetFingerTimeout", timeout =>
                 {
                     Console.WriteLine($"Set timeout from server:{timeout}");
                 });
+
+
 
                 //inputQueue.EnqueueEvent += listener.OnSignalRMessage;
 
@@ -68,10 +78,13 @@ namespace Worker.Host
     {
         public string Port { get; set; }
         public SignalRMethod Method { get; set; }
+        public int Uid { get; set; }
+        public int Privilage { get; set; }
     }
 
     public enum SignalRMethod
     {
-        GetFingerTimeoutCurrent
+        GetFingerTimeoutCurrent,
+        AddFinger
     }
 }

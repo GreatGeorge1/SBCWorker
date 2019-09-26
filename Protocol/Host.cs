@@ -112,6 +112,7 @@ namespace Protocol
             {
                 while(executedMethod.IsCompleted != true)
                 {
+                    Console.WriteLine("Waiting to execute method");
                     await Task.Delay(50);
                 }
                 ExecuteMethod(header);
@@ -130,6 +131,29 @@ namespace Protocol
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
                         await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,(byte)CommandHeader.FingerTimeoutCurrent, 0x02,0x00,0x01,0x01,0x03,0x0d,0x0a});
+                        executedMethod.RepeatCount++;
+                        await Task.Delay(200);
+                    }
+                    return true;
+                    break;
+                case CommandHeader.FingerWriteInBase:
+
+                    var list = new List<byte>();
+                 //   list.AddRange(new byte[] { 0x02, 0xd5,
+                 //           (byte)CommandHeader.FingerWriteInBase,
+                 //           (byte)ExecutedMethod.CommandValue.Length });
+                 //   list.AddRange(ExecutedMethod.CommandValue);
+                 //   list.Add(RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length));
+                 //   list.AddRange(new byte[] { 0x03, 0x0d, 0x0a });
+                 //   var msg = list.ToArray();
+                    while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerWriteInBase)
+                    {
+                        Console.WriteLine("FingerWriteInBase switch case");
+                        //Console.WriteLine(BitConverter.ToString(msg));
+                        await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,
+                            (byte)CommandHeader.FingerWriteInBase,
+                            0x02, 0x09, 0x01, 0x0B, 0x03, 0x0d, 0x0a });
+                       // await transport.WriteMessageAsync(msg);
                         executedMethod.RepeatCount++;
                         await Task.Delay(200);
                     }
