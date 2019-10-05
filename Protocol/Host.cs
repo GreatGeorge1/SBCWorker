@@ -66,7 +66,7 @@ namespace Protocol
             while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == command)
             {
                 res = await transport.WriteMessageAsync(response).ConfigureAwait(false);
-                Console.WriteLine("Response sent");
+                Console.WriteLine($"Response sent: '{BitConverter.ToString(response)}'");
                 executedMethod.RepeatCount++;
                 await Task.Delay(200).ConfigureAwait(false);
             }
@@ -82,7 +82,7 @@ namespace Protocol
             executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
             executedMethod.PropertyChanged += OnExecuteMethodChange;
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
-            executedMethod.RepeatLimit = 25;
+            executedMethod.RepeatLimit = 10;
             logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
         }
@@ -95,7 +95,7 @@ namespace Protocol
             executedMethod = method;
             executedMethod.PropertyChanged += OnExecuteMethodChange;
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
-            executedMethod.RepeatLimit = 25;
+            executedMethod.RepeatLimit = 10;
             logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{method.MethodInfo.CommandHeader.GetDisplayName()}");
         }
@@ -123,37 +123,57 @@ namespace Protocol
 
         private async Task<bool> ProcessControllerMethodAsync()
         {
+            var list = new List<byte>();
             switch (executedMethod.MethodInfo.CommandHeader)
             {
-                case CommandHeader.FingerTimeoutCurrent:
-                   
+                case CommandHeader.FingerTimeoutCurrent:     
                     while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
-                        await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,(byte)CommandHeader.FingerTimeoutCurrent, 0x02,0x00,0x01,0x01,0x03,0x0d,0x0a});
+                        await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,(byte)CommandHeader.FingerTimeoutCurrent, 0x01, 0x02,0x00,0x01});
                         executedMethod.RepeatCount++;
                         await Task.Delay(200);
                     }
                     return true;
                     break;
                 case CommandHeader.FingerWriteInBase:
-
-                    var list = new List<byte>();
-                    list.AddRange(new byte[] { 0x02, 0xd5,
-                               (byte)CommandHeader.FingerWriteInBase,
-                               (byte)ExecutedMethod.CommandValue.Length });
+                    list = new List<byte>();
+                    list.AddRange(new byte[] { 
+                        0x02, 
+                        0xd5,
+                        (byte)CommandHeader.FingerWriteInBase,
+                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
+                        (byte)ExecutedMethod.CommandValue.Length
+                    });
                     list.AddRange(ExecutedMethod.CommandValue);
-                    list.Add(RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length));
-                    list.AddRange(new byte[] { 0x03, 0x0d, 0x0a });
+              
                     var msg = list.ToArray();
                     while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerWriteInBase)
                     {
                         Console.WriteLine("FingerWriteInBase switch case");
                         Console.WriteLine(BitConverter.ToString(msg));
-                        //await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,
-                        //    (byte)CommandHeader.FingerWriteInBase,
-                        //    0x02, 0x09, 0x01, 0x0B, 0x03, 0x0d, 0x0a });
                         await transport.WriteMessageAsync(msg);
+                        executedMethod.RepeatCount++;
+                        await Task.Delay(200);
+                    }
+                    return true;
+                    break;
+                case CommandHeader.TerminalConf:
+                    list = new List<byte>();
+                    list.AddRange(new byte[] {
+                        0x02,
+                        0xd5,
+                        (byte)CommandHeader.TerminalConf,
+                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
+                        (byte)ExecutedMethod.CommandValue.Length
+                    });
+                    list.AddRange(ExecutedMethod.CommandValue);
+                    var msg1 = list.ToArray();
+                    while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
+                    {
+                        Console.WriteLine("TerminalConf switch case");
+                        Console.WriteLine(BitConverter.ToString(msg1));
+                        await transport.WriteMessageAsync(msg1);
                         executedMethod.RepeatCount++;
                         await Task.Delay(200);
                     }
@@ -307,6 +327,10 @@ namespace Protocol
                 case CommandHeader.Ble:
                     PushBleCommandEvent(executedMethod.CommandValue);
                     return true;
+                    break;
+                case CommandHeader.Error:
+                    Console.WriteLine("Error processed");
+                    executedMethod.IsCompleted = true;
                     break;
                     //case ProtocolCommands.
             }

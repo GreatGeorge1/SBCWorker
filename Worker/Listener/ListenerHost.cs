@@ -59,6 +59,11 @@ namespace Worker.Host
                     Console.WriteLine($"Set timeout from server:{timeout}");
                 });
 
+                client.Connection.On<string>("SendConfig", json_string => 
+                {
+                    Console.WriteLine("SignalR SendConfig HIT!");
+                    inputQueue.Enqueue(new SignalRMessage { Method = SignalRMethod.SendConfig, JsonString = json_string });
+                });
 
 
                 //inputQueue.EnqueueEvent += listener.OnSignalRMessage;
@@ -80,11 +85,13 @@ namespace Worker.Host
         public SignalRMethod Method { get; set; }
         public int Uid { get; set; }
         public int Privilage { get; set; }
+        public string JsonString { get; set; }
     }
 
     public enum SignalRMethod
     {
         GetFingerTimeoutCurrent,
-        AddFinger
+        AddFinger,
+        SendConfig
     }
 }

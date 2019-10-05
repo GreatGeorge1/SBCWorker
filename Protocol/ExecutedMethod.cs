@@ -108,16 +108,12 @@ namespace Protocol
             list.Add(0x02);
             list.Add((byte)MessageType.RES);
             list.Add((byte)this.MethodInfo.CommandHeader);
+            list.Add(RequestMiddleware.CalCheckSum(result, result.Length));
             list.Add((byte)result.Length);
             foreach(var item in result)
             {
                 list.Add(item);
             }
-            list.Add(RequestMiddleware.CalCheckSum(result, result.Length));
-            list.Add(0x03);
-            list.Add(0x0d);
-            list.Add(0x0a);
-           // byte[] msg = { 0x02, 0xD6, 0xC7, 0x02, 0x00, 0x01, 0x01, 0x03, 0x0d,0x0a };
 
             return list.ToArray();
         }

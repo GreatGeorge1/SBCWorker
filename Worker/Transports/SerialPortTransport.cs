@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Protocol;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
@@ -16,6 +17,7 @@ namespace Worker.Host.Transports
     {
         private readonly SerialConfig port;
         private SerialPort stream;
+
         private ILogger logger { get; set; }
         public MessageQueue<byte[]> InputQueue { get; set; }
         public MessageQueue<byte[]> OutputQueue { get; set; }
@@ -117,29 +119,69 @@ namespace Worker.Host.Transports
         /// <returns></returns>
         public async Task ReadMessageAsync()
         {
+            if (serial_read)
+            {
+                return;
+            }
+            serial_read = true;
+            Stopwatch sw = new Stopwatch();
             try
             {
-                if (serial_read)
-                {
-                    return;
-                }
-                serial_read = true;
                 do
                 {
-                    await Task.Delay(100);
+                    sw.Start();
+                    var list = new List<byte>();
                     var bytes = new List<byte>();
-                    byte r = 0x0d; //'\r'
-                    byte n = 0x0a; //'\n'
-                    byte temp;
                     do
                     {
-                        var _byte = stream.ReadByte();
-                        temp = (byte) _byte;
-                        if (temp != r && temp != n)
+                        if(sw.ElapsedMilliseconds >= 2000)
                         {
-                            bytes.Add((byte) _byte);
+                            logger.LogWarning("ReadTimeout");
+                            serial_read = false;
+                            return;
                         }
-                    } while (stream.BytesToRead > 0 && !(temp == r || temp == n));
+                        byte _byte = 0;
+                        try
+                        {
+                            _byte = (byte)stream.ReadByte();
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                        list.Add(_byte);
+                    } while (stream.BytesToRead > 0 && list.Count<5);
+                    var len = list.LastOrDefault();
+                    if (len == 0)
+                    {
+                        logger.LogWarning("corrupted message");
+                        serial_read = false;
+                        return;
+                    }
+                    int k = len;
+                    bytes.AddRange(list);
+                    sw.Reset();
+                    do
+                    {
+                        if (sw.ElapsedMilliseconds >= 2000)
+                        {
+                            logger.LogWarning("ReadTimeout");
+                            serial_read = false;
+                            return;
+                        }
+                        byte _byte = 0;
+                        try
+                        {
+                            _byte = (byte)stream.ReadByte();
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                        bytes.Add(_byte);
+                        k--;
+                    } while (stream.BytesToRead > 0 && k>0);
+
                     var res = bytes.ToArray();
                     string str = BitConverter.ToString(res);
                     Console.WriteLine(str);

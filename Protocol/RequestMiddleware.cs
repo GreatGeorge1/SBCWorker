@@ -11,7 +11,6 @@ namespace Protocol
         public static bool Process(byte[] message, out Message resMsg)
         {
             var executedMethod = new ExecutedMethod();
-            message = message.TakeWhile(x => !(x.Equals(0x0D)) && !(x.Equals(0x0A))).ToArray();
             if (IsValid(message))
             {
                 MessageType mtype = MessageType.NotSet;
@@ -45,13 +44,7 @@ namespace Protocol
             {
                 k++;
             }
-
-            if (message[message.Length-1] == 0x03)
-            {
-                k++;
-            }
-
-            if (k == 2)
+            if (k == 1)
             {
                 return true;
             }
@@ -92,9 +85,9 @@ namespace Protocol
         {
             try
             {
-                var temp = message[3];
-                var bytes = message.Skip(4).Take(temp).ToArray();
-                var checksum = message.Skip(4 + (int) temp).SkipLast(1).First();
+                var temp = message[4];
+                var bytes = message.Skip(5).Take(temp).ToArray();
+                var checksum = message[3];
                 newChecksum = CalCheckSum(bytes, bytes.Length);
                 if (checksum == newChecksum)
                 {
@@ -103,7 +96,7 @@ namespace Protocol
             }
             catch (Exception e)
             {
-
+                Console.WriteLine("Not valid checksum");
             }
             newChecksum = 0x00; 
             return false;

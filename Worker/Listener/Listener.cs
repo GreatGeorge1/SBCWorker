@@ -58,7 +58,14 @@ namespace Worker.Host
                     break;
                 case SignalRMethod.AddFinger:
                     Console.WriteLine("OnSignalRMessage AddFinger HIT");
+                    Console.WriteLine($"uid: '{args.Item.Uid}' hex: '{BitConverter.ToString(new byte[] { (byte)args.Item.Uid }) }'");
                     await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)args.Item.Uid, (byte)args.Item.Privilage });
+                    break;
+                case SignalRMethod.SendConfig:
+                    Console.WriteLine("OnSignalRMessage SendConfig HIT");
+                    Console.WriteLine($"json: '{args.Item.JsonString}' ");
+                    byte[] jsonBytes = ASCIIEncoding.ASCII.GetBytes(args.Item.JsonString);
+                    await host.ExecuteControllerMethodAsync(CommandHeader.TerminalConf, jsonBytes);
                     break;
                 default:Console.WriteLine("OnSignalRMessage UNexpected");
                     break;
