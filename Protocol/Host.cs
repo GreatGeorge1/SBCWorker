@@ -139,21 +139,21 @@ namespace Protocol
                 case CommandHeader.FingerWriteInBase:
 
                     var list = new List<byte>();
-                 //   list.AddRange(new byte[] { 0x02, 0xd5,
-                 //           (byte)CommandHeader.FingerWriteInBase,
-                 //           (byte)ExecutedMethod.CommandValue.Length });
-                 //   list.AddRange(ExecutedMethod.CommandValue);
-                 //   list.Add(RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length));
-                 //   list.AddRange(new byte[] { 0x03, 0x0d, 0x0a });
-                 //   var msg = list.ToArray();
+                    list.AddRange(new byte[] { 0x02, 0xd5,
+                               (byte)CommandHeader.FingerWriteInBase,
+                               (byte)ExecutedMethod.CommandValue.Length });
+                    list.AddRange(ExecutedMethod.CommandValue);
+                    list.Add(RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length));
+                    list.AddRange(new byte[] { 0x03, 0x0d, 0x0a });
+                    var msg = list.ToArray();
                     while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerWriteInBase)
                     {
                         Console.WriteLine("FingerWriteInBase switch case");
-                        //Console.WriteLine(BitConverter.ToString(msg));
-                        await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,
-                            (byte)CommandHeader.FingerWriteInBase,
-                            0x02, 0x09, 0x01, 0x0B, 0x03, 0x0d, 0x0a });
-                       // await transport.WriteMessageAsync(msg);
+                        Console.WriteLine(BitConverter.ToString(msg));
+                        //await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,
+                        //    (byte)CommandHeader.FingerWriteInBase,
+                        //    0x02, 0x09, 0x01, 0x0B, 0x03, 0x0d, 0x0a });
+                        await transport.WriteMessageAsync(msg);
                         executedMethod.RepeatCount++;
                         await Task.Delay(200);
                     }
