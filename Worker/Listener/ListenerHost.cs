@@ -54,17 +54,52 @@ namespace Worker.Host
                     inputQueue.Enqueue(new SignalRMessage { Method = SignalRMethod.AddFinger, Uid=uid, Privilage=privilage  });
                 });
 
-                client.Connection.On<int>("SetFingerTimeout", timeout =>
-                {
-                    Console.WriteLine($"Set timeout from server:{timeout}");
-                });
-
                 client.Connection.On<string>("SendConfig", json_string => 
                 {
                     Console.WriteLine("SignalR SendConfig HIT!");
                     inputQueue.Enqueue(new SignalRMessage { Method = SignalRMethod.SendConfig, JsonString = json_string });
                 });
 
+                client.Connection.On<int, string>("DeleteFingerById", (id, port) => 
+                {
+                    Console.WriteLine("SignalR DeleteFingerById HIT!");
+                    inputQueue.Enqueue(new SignalRMessage { Method = SignalRMethod.DeleteFingerById, Port = port, Uid=id });
+                });
+
+                client.Connection.On<string, string, int, int, string>("AddFingerByBle", (userId, ble, id, privilage, port) => 
+                {
+                    Console.WriteLine("SignalR AddFingerByBle HIT!");
+                    inputQueue.Enqueue(new SignalRMessage 
+                    { 
+                        Method = SignalRMethod.AddFingerByBle, 
+                        Port = port, 
+                        Uid = id, 
+                        UserId=userId,
+                        BleString=ble,
+                        Privilage=privilage
+                    });
+                });
+
+                client.Connection.On<int, string>("SetFingerTimeout", (timeout, port) =>
+                {
+                    Console.WriteLine("SignalR SetFingerTimeout HIT!");
+                    inputQueue.Enqueue(new SignalRMessage
+                    {
+                        Method = SignalRMethod.SetFingerTimeout,
+                        Port = port,
+                        Timeout = timeout
+                    });
+                });
+
+                client.Connection.On<string>("DeleteAllFingerprints", port=> 
+                {
+                    Console.WriteLine("SignalR DeleteAllFingerprints HIT!");
+                    inputQueue.Enqueue(new SignalRMessage
+                    {
+                        Method = SignalRMethod.DeleteAllFingerprints,
+                        Port = port
+                    });
+                });
 
                 //inputQueue.EnqueueEvent += listener.OnSignalRMessage;
 
@@ -83,15 +118,22 @@ namespace Worker.Host
     {
         public string Port { get; set; }
         public SignalRMethod Method { get; set; }
+        public string UserId { get; set; }
         public int Uid { get; set; }
+        public string BleString { get; set; }
         public int Privilage { get; set; }
         public string JsonString { get; set; }
+        public int Timeout { get; set; }
     }
 
     public enum SignalRMethod
     {
         GetFingerTimeoutCurrent,
         AddFinger,
-        SendConfig
+        SendConfig,
+        DeleteFingerById,
+        AddFingerByBle,
+        DeleteAllFingerprints,
+        SetFingerTimeout
     }
 }

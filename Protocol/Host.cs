@@ -50,6 +50,7 @@ namespace Protocol
         /// </summary>
         private protected ExecutedMethod executedMethod { get; set; }
         private protected readonly IByteTransport transport;
+        private protected bool IsLive=true;
 
         public ExecutedMethod ExecutedMethod
         {
@@ -63,12 +64,12 @@ namespace Protocol
             executedMethod.ResponseValue = result;
             var response = executedMethod.CreateResponse(result);
             var res = false;
-            while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == command)
+            while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == command)
             {
                 res = await transport.WriteMessageAsync(response).ConfigureAwait(false);
                 Console.WriteLine($"Response sent: '{BitConverter.ToString(response)}'");
                 executedMethod.RepeatCount++;
-                await Task.Delay(200).ConfigureAwait(false);
+                Task.Delay(TimeSpan.FromSeconds(1)).Wait();
             }
             return res;
         }
@@ -76,48 +77,57 @@ namespace Protocol
         public void ExecuteMethod(CommandHeader command)
         {
             Method methodInfo;
-            Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
             Static.GetMethods().TryGetValue(command, out methodInfo);
             executedMethod = null;
             executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
             executedMethod.PropertyChanged += OnExecuteMethodChange;
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
-            executedMethod.RepeatLimit = 10;
-            logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
+            executedMethod.RepeatLimit = 3;
+           // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
+        }
+
+        public ExecutedMethod PrepareExecutedMethod(CommandHeader command)
+        {
+            Method methodInfo;
+            Static.GetMethods().TryGetValue(command, out methodInfo);
+            //executedMethod = null;
+            executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
+            return executedMethod;
         }
 
         public void ExecuteMethod (ExecutedMethod method)
         {
-            Console.WriteLine($"ExecuteMethod hit:{method.MethodInfo.CommandHeader.GetDisplayName()}");
         //    Protocol.GetMethods().TryGetValue(command, out methodInfo);
             executedMethod = null;
             executedMethod = method;
             executedMethod.PropertyChanged += OnExecuteMethodChange;
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
-            executedMethod.RepeatLimit = 10;
-            logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
+            executedMethod.RepeatLimit = 3;
+           // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{method.MethodInfo.CommandHeader.GetDisplayName()}");
         }
 
-        public async Task ExecuteControllerMethodAsync(CommandHeader header, byte[] value)
+        public async Task<bool> ExecuteControllerMethodAsync(CommandHeader header, byte[] value)
         {
             if(executedMethod is null)
             {
-                ExecuteMethod(header);
-                executedMethod.CommandValue = value;
-                await ProcessControllerMethodAsync();
+                var exMethod=PrepareExecutedMethod(header);
+                exMethod.CommandValue = value;
+                ExecuteMethod(exMethod);
+                return await ProcessControllerMethodAsync();
             }
             else
             {
                 while(executedMethod.IsCompleted != true)
                 {
                     Console.WriteLine("Waiting to execute method");
-                    await Task.Delay(50);
+                    Task.Delay(50).Wait();
                 }
-                ExecuteMethod(header);
-                executedMethod.CommandValue = value;
-                await ProcessControllerMethodAsync();
+                var exMethod = PrepareExecutedMethod(header);
+                exMethod.CommandValue = value;
+                ExecuteMethod(exMethod);
+                return await ProcessControllerMethodAsync();
             }
         }
 
@@ -127,12 +137,12 @@ namespace Protocol
             switch (executedMethod.MethodInfo.CommandHeader)
             {
                 case CommandHeader.FingerTimeoutCurrent:     
-                    while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
+                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
                         await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,(byte)CommandHeader.FingerTimeoutCurrent, 0x01, 0x02,0x00,0x01});
                         executedMethod.RepeatCount++;
-                        await Task.Delay(200);
+                        Task.Delay(TimeSpan.FromSeconds(1)).Wait();
                     }
                     return true;
                     break;
@@ -148,13 +158,13 @@ namespace Protocol
                     list.AddRange(ExecutedMethod.CommandValue);
               
                     var msg = list.ToArray();
-                    while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerWriteInBase)
+                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerWriteInBase)
                     {
                         Console.WriteLine("FingerWriteInBase switch case");
                         Console.WriteLine(BitConverter.ToString(msg));
                         await transport.WriteMessageAsync(msg);
                         executedMethod.RepeatCount++;
-                        await Task.Delay(200);
+                        Task.Delay(TimeSpan.FromSeconds(10)).Wait();
                     }
                     return true;
                     break;
@@ -169,13 +179,76 @@ namespace Protocol
                     });
                     list.AddRange(ExecutedMethod.CommandValue);
                     var msg1 = list.ToArray();
-                    while (!executedMethod.IsCompleted & executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
+                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
                     {
                         Console.WriteLine("TerminalConf switch case");
                         Console.WriteLine(BitConverter.ToString(msg1));
                         await transport.WriteMessageAsync(msg1);
                         executedMethod.RepeatCount++;
-                        await Task.Delay(200);
+                        Task.Delay(TimeSpan.FromSeconds(60)).Wait();
+                    }
+                    return true;
+                    break;
+                case CommandHeader.FingerDeleteId:
+                    list = new List<byte>();
+                    list.AddRange(new byte[] {
+                        0x02,
+                        0xd5,
+                        (byte)CommandHeader.FingerDeleteId,
+                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
+                        (byte)ExecutedMethod.CommandValue.Length
+                    });
+                    list.AddRange(ExecutedMethod.CommandValue);
+                    var msg2 = list.ToArray();
+                    while (executedMethod.IsCompleted==false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerDeleteId)
+                    {
+                        Console.WriteLine("FingerDeleteId  loop");
+                        Console.WriteLine(BitConverter.ToString(msg2));
+                        await transport.WriteMessageAsync(msg2);
+                        executedMethod.RepeatCount++;
+                        Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+                    }
+                    return true;
+                    break;
+                case CommandHeader.FingerDeleteAll:
+                    list = new List<byte>();
+                    list.AddRange(new byte[] {
+                        0x02,
+                        0xd5,
+                        (byte)CommandHeader.FingerDeleteAll,
+                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
+                        (byte)ExecutedMethod.CommandValue.Length
+                    });
+                    list.AddRange(ExecutedMethod.CommandValue);
+                    var msg3 = list.ToArray();
+                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerDeleteAll)
+                    {
+                        Console.WriteLine("FingerDeleteAll  loop");
+                        Console.WriteLine(BitConverter.ToString(msg3));
+                        await transport.WriteMessageAsync(msg3);
+                        executedMethod.RepeatCount++;
+                        Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+                    }
+                    return true;
+                    break;
+                case CommandHeader.FingerSetTimeout:
+                    list = new List<byte>();
+                    list.AddRange(new byte[] {
+                        0x02,
+                        0xd5,
+                        (byte)CommandHeader.FingerSetTimeout,
+                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
+                        (byte)ExecutedMethod.CommandValue.Length
+                    });
+                    list.AddRange(ExecutedMethod.CommandValue);
+                    var msg4 = list.ToArray();
+                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerSetTimeout)
+                    {
+                        Console.WriteLine("FingerSetTimeout  loop");
+                        Console.WriteLine(BitConverter.ToString(msg4));
+                        await transport.WriteMessageAsync(msg4);
+                        executedMethod.RepeatCount++;
+                        Task.Delay(TimeSpan.FromSeconds(1)).Wait();
                     }
                     return true;
                     break;
@@ -214,8 +287,8 @@ namespace Protocol
 
         protected async void OnExecuteMethodChange(object sender, PropertyChangedEventArgs args)
         {
-            logger.LogInformation($"Executed method property changed: {args.PropertyName}");
-            if (!executedMethod.IsFired)
+            Console.WriteLine($"Info: Executed method property changed: {args.PropertyName}");
+            if (executedMethod.IsFired==false)
             {
                 var direction = executedMethod.MethodInfo.DirectionTo;
                 if (executedMethod.MethodInfo.HasCommandValue)
@@ -223,13 +296,13 @@ namespace Protocol
                     if(executedMethod.CommandValue!=null && executedMethod.CommandValue.Length > 0)
                     {
                         executedMethod.IsFired = true;
-                        _=(direction == Direction.Controller) ? ProcessTerminalMethodAsync() : await ProcessControllerMethodAsync().ConfigureAwait(false);
+                        _=(direction == Direction.Controller) ? ProcessTerminalMethodAsync() : await ProcessControllerMethodAsync();
                     };
                 }
                 else
                 {
                     executedMethod.IsFired = true;
-                    _ = (direction == Direction.Controller) ? ProcessTerminalMethodAsync() : await ProcessControllerMethodAsync().ConfigureAwait(false);
+                    _ = (direction == Direction.Controller) ? ProcessTerminalMethodAsync() : await ProcessControllerMethodAsync();
                 }
              
             }
@@ -272,6 +345,10 @@ namespace Protocol
                         switch (message.Type)
                         {
                             case MessageType.ACK:
+                                if (ExecutedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
+                                {
+                                    Task.Delay(TimeSpan.FromSeconds(25)).Wait();
+                                }
                                 executedMethod.IsCompleted = true;
                                 break;
                             case MessageType.NACK:
