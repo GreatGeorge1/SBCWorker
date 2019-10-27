@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Worker.Host
 {
-    public partial class Listener
+    public partial class Listener<QueueT>
     {
         private async Task<bool> VerifyFinger(byte[] finger)
         {

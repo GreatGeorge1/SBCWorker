@@ -60,25 +60,25 @@ namespace Worker.Host.SignalR
             connection = new HubConnectionBuilder()
                .WithUrl(ConnectionUri, options =>
                {
-                   options.AccessTokenProvider = async () => await GetAccessToken();
+                   options.AccessTokenProvider = async () => await GetAccessToken().ConfigureAwait(false);
                    // options.
                })
                .WithAutomaticReconnect()
                .Build();
-            connection.Closed += async (error) => await ConnectionClosed(error);
+            connection.Closed += async (error) => await ConnectionClosed(error).ConfigureAwait(false);
             connection.Reconnected += connectionId => ConnectionReconnected(connectionId);
             connection.Reconnecting += error => ConnectionReconnecting(error);
         }
 
         public async Task StartAsync(CancellationToken token)
         {
-            await ConnectWithRetryAsync(connection, token);
+            await ConnectWithRetryAsync(connection, token).ConfigureAwait(false);
         }
 
         private async Task ConnectionClosed(Exception error)
         {
-            await Task.Delay(new Random().Next(0, 5) * 1000);
-            await connection.StartAsync();
+            await Task.Delay(new Random().Next(0, 5) * 1000).ConfigureAwait(false);
+            await connection.StartAsync().ConfigureAwait(false);
         }
 
         private Task ConnectionReconnected(string connectionId)
@@ -132,7 +132,7 @@ namespace Worker.Host.SignalR
             {
                 try
                 {
-                    await connection.StartAsync(token);
+                    await connection.StartAsync(token).ConfigureAwait(false);
                     Debug.Assert(connection.State == HubConnectionState.Connected);
                     Console.WriteLine("Connected");
                     return true;
@@ -146,7 +146,7 @@ namespace Worker.Host.SignalR
                     // Failed to connect, trying again in 5000 ms.
                     Debug.Assert(connection.State == HubConnectionState.Disconnected);
                     Console.WriteLine("Trying to connect");
-                    await Task.Delay(5000);
+                    await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
                 }
             }
         }

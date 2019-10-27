@@ -76,7 +76,7 @@ namespace DevConsole
             byte checksum;
 
             Console.WriteLine(Encoding.Default.GetString(arr));
-            var res =RequestMiddleware.Process(arr, out message1);
+            var res =RequestMiddleware.Process(arr);
 
             log.Information($"res {res.ToString()}");
             var cardbytes = message.Skip(4).Take(8).ToArray();

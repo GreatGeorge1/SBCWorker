@@ -69,7 +69,7 @@ namespace Protocol
                 res = await transport.WriteMessageAsync(response).ConfigureAwait(false);
                 Console.WriteLine($"Response sent: '{BitConverter.ToString(response)}'");
                 executedMethod.RepeatCount++;
-                Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+                await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
             }
             return res;
         }
@@ -90,7 +90,17 @@ namespace Protocol
         public ExecutedMethod PrepareExecutedMethod(CommandHeader command)
         {
             Method methodInfo;
-            Static.GetMethods().TryGetValue(command, out methodInfo);
+            var flag=Static.GetMethods().TryGetValue(command, out methodInfo);
+            if (flag==false || methodInfo is null)
+            {
+                logger.LogCritical("methodInfo is null, panic");
+                flag=Static.GetMethods().TryGetValue(command, out methodInfo);
+                if(flag==false || methodInfo is null)
+                {
+                    logger.LogCritical("methodInfo is null, insult");
+                    throw new ArgumentNullException(nameof(methodInfo));
+                }
+            }
             //executedMethod = null;
             executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
             return executedMethod;
@@ -101,6 +111,10 @@ namespace Protocol
         //    Protocol.GetMethods().TryGetValue(command, out methodInfo);
             executedMethod = null;
             executedMethod = method;
+            if (executedMethod is null) {
+                logger.LogCritical("method is null, heartattack");
+                return;
+            }
             executedMethod.PropertyChanged += OnExecuteMethodChange;
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
             executedMethod.RepeatLimit = 3;
@@ -114,20 +128,30 @@ namespace Protocol
             {
                 var exMethod=PrepareExecutedMethod(header);
                 exMethod.CommandValue = value;
+                if(exMethod is null)
+                {
+                    logger.LogCritical("exMethod is null, brain cancer");
+                    return false;
+                }
                 ExecuteMethod(exMethod);
-                return await ProcessControllerMethodAsync();
+                return await ProcessControllerMethodAsync().ConfigureAwait(false);
             }
             else
             {
                 while(executedMethod.IsCompleted != true)
                 {
                     Console.WriteLine("Waiting to execute method");
-                    Task.Delay(50).Wait();
+                    await Task.Delay(50).ConfigureAwait(false);
                 }
                 var exMethod = PrepareExecutedMethod(header);
+                if(exMethod is null)
+                {
+                    logger.LogCritical("exMethod is null, brain cancer");
+                    return false;
+                }
                 exMethod.CommandValue = value;
                 ExecuteMethod(exMethod);
-                return await ProcessControllerMethodAsync();
+                return await ProcessControllerMethodAsync().ConfigureAwait(false);
             }
         }
 
@@ -140,9 +164,9 @@ namespace Protocol
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
-                        await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,(byte)CommandHeader.FingerTimeoutCurrent, 0x01, 0x02,0x00,0x01});
+                        await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,(byte)CommandHeader.FingerTimeoutCurrent, 0x01, 0x02,0x00,0x01}).ConfigureAwait(false);
                         executedMethod.RepeatCount++;
-                        Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+                        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                     return true;
                     break;
@@ -162,9 +186,9 @@ namespace Protocol
                     {
                         Console.WriteLine("FingerWriteInBase switch case");
                         Console.WriteLine(BitConverter.ToString(msg));
-                        await transport.WriteMessageAsync(msg);
+                        await transport.WriteMessageAsync(msg).ConfigureAwait(false);
                         executedMethod.RepeatCount++;
-                        Task.Delay(TimeSpan.FromSeconds(10)).Wait();
+                        await Task.Delay(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
                     }
                     return true;
                     break;
@@ -183,9 +207,9 @@ namespace Protocol
                     {
                         Console.WriteLine("TerminalConf switch case");
                         Console.WriteLine(BitConverter.ToString(msg1));
-                        await transport.WriteMessageAsync(msg1);
+                        await transport.WriteMessageAsync(msg1).ConfigureAwait(false);
                         executedMethod.RepeatCount++;
-                        Task.Delay(TimeSpan.FromSeconds(60)).Wait();
+                        await Task.Delay(TimeSpan.FromSeconds(60)).ConfigureAwait(false);
                     }
                     return true;
                     break;
@@ -204,9 +228,9 @@ namespace Protocol
                     {
                         Console.WriteLine("FingerDeleteId  loop");
                         Console.WriteLine(BitConverter.ToString(msg2));
-                        await transport.WriteMessageAsync(msg2);
+                        await transport.WriteMessageAsync(msg2).ConfigureAwait(false);
                         executedMethod.RepeatCount++;
-                        Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+                        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                     return true;
                     break;
@@ -225,9 +249,9 @@ namespace Protocol
                     {
                         Console.WriteLine("FingerDeleteAll  loop");
                         Console.WriteLine(BitConverter.ToString(msg3));
-                        await transport.WriteMessageAsync(msg3);
+                        await transport.WriteMessageAsync(msg3).ConfigureAwait(false);
                         executedMethod.RepeatCount++;
-                        Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+                        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                     return true;
                     break;
@@ -246,9 +270,9 @@ namespace Protocol
                     {
                         Console.WriteLine("FingerSetTimeout  loop");
                         Console.WriteLine(BitConverter.ToString(msg4));
-                        await transport.WriteMessageAsync(msg4);
+                        await transport.WriteMessageAsync(msg4).ConfigureAwait(false);
                         executedMethod.RepeatCount++;
-                        Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+                        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                     return true;
                     break;
@@ -296,29 +320,28 @@ namespace Protocol
                     if(executedMethod.CommandValue!=null && executedMethod.CommandValue.Length > 0)
                     {
                         executedMethod.IsFired = true;
-                        _=(direction == Direction.Controller) ? ProcessTerminalMethodAsync() : await ProcessControllerMethodAsync();
+                        _=(direction == Direction.Controller) ? await ProcessTerminalMethodAsync().ConfigureAwait(false) : await ProcessControllerMethodAsync().ConfigureAwait(false);
                     };
                 }
                 else
                 {
                     executedMethod.IsFired = true;
-                    _ = (direction == Direction.Controller) ? ProcessTerminalMethodAsync() : await ProcessControllerMethodAsync();
+                    _ = (direction == Direction.Controller) ? await ProcessTerminalMethodAsync().ConfigureAwait(false) : await ProcessControllerMethodAsync().ConfigureAwait(false);
                 }
              
             }
         }
 
-        public void DataReceived(object sender, MessageQueueEnqueueEventArgs<byte[]> e)
+        public async void DataReceived(object sender, MessageQueueEnqueueEventArgs<byte[]> e)
         {
             byte[] input;
             bool dequeue = transport.InputQueue.TryDequeue(out input);
             if (input!=null && input.Length>0)
             {
-                Message message;
-                var res = RequestMiddleware.Process(input, out message);
+                var message = RequestMiddleware.Process(input);
                 Console.WriteLine($"message type: {message.Type.ToString()}");
-                Console.WriteLine($"message type: {res.ToString()}");
-                if (res)
+              //  Console.WriteLine($"message type: {res.ToString()}");
+                if (message.IsValid)
                 {
                     if (executedMethod == null)
                     {
@@ -347,7 +370,7 @@ namespace Protocol
                             case MessageType.ACK:
                                 if (ExecutedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
                                 {
-                                    Task.Delay(TimeSpan.FromSeconds(25)).Wait();
+                                    await Task.Delay(TimeSpan.FromSeconds(25)).ConfigureAwait(false);
                                 }
                                 executedMethod.IsCompleted = true;
                                 break;
@@ -377,7 +400,7 @@ namespace Protocol
                 }
                 else
                 {
-                    logger.LogWarning($"Process error valid:{res.ToString()}");
+                    logger.LogWarning($"Process error valid:{message.IsValid}");
                 }
 
             }
@@ -389,7 +412,7 @@ namespace Protocol
 
         #endregion
 
-        private bool ProcessTerminalMethodAsync()
+        private async Task<bool> ProcessTerminalMethodAsync()
         {
             switch (executedMethod.MethodInfo.CommandHeader)
             {

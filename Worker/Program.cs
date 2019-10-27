@@ -74,7 +74,7 @@ namespace Worker.Host
 
             }).Build();
 
-            await host.RunAsync();
+            await host.RunAsync().ConfigureAwait(false);
         }
     }
 }

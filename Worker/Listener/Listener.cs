@@ -34,7 +34,7 @@ namespace Worker.Host
         public async Task CompleteBle(Protocol.Host host, int id, int privilage)
         {
             Console.WriteLine("Saga CompleteBle HIT!");
-            var res=await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)id, (byte)privilage });
+            var res=await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)id, (byte)privilage }).ConfigureAwait(false);
             FingerWriteIsCompleted = true;
             IsCompleted = true;
             Console.WriteLine("Info: Saga is completed");
@@ -42,20 +42,20 @@ namespace Worker.Host
         public bool FingerWriteIsCompleted { get; set;  }= false;//step 2
     }
 
-    public partial class Listener
+    public partial class Listener<QueueT> 
     {
         private readonly ILogger logger;
         private readonly ControllerDbContext context;
         // private readonly SerialConfig port;
         private readonly Protocol.Host host;
         private readonly string PortName;
-        private readonly MessageQueue<SignalRMessage> inputQueue;
+        private readonly MessageQueue<QueueT> inputQueue;
 
         private AddFingerSaga FSaga = null;
         private readonly Queue<AddFingerSaga> SagaQueue = new Queue<AddFingerSaga>();
 
         public Listener(ILogger logger, SerialConfig port,
-           ControllerDbContext dbcontext, MessageQueue<SignalRMessage> inputQueue)
+           ControllerDbContext dbcontext, MessageQueue<QueueT> inputQueue)
         {
             PortName = port.PortName;
             this.logger = logger;
@@ -89,7 +89,7 @@ namespace Worker.Host
             {
                 while (FSaga.IsCompleted != true)
                 {
-                    Task.Delay(1000).Wait();
+                    await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                 }
                 FSaga = SagaQueue.Dequeue();
                 FSaga.IsFired = true;
@@ -97,53 +97,54 @@ namespace Worker.Host
             }
         }
 
-        public async void OnSignalRMessage(object sender, MessageQueueEnqueueEventArgs<SignalRMessage> args)
+        public async void OnSignalRMessage(object sender, MessageQueueEnqueueEventArgs<QueueT> args)
         {
             //if (PortName != args.Item.Port)
             //{
             //    return;
             //}
             //Console.WriteLine("OnSignalRMessage HIT");
+            dynamic t = args;
             var item = inputQueue.Dequeue();//govno
-            switch(args.Item.Method){
+            switch(t.Item.Method){
                 case SignalRMethod.GetFingerTimeoutCurrent:
                     Console.WriteLine("OnSignalRMessage GetFingerTimeoutCurrent HIT2");       
-                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerTimeoutCurrent, new byte[] { });
+                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerTimeoutCurrent, new byte[] { }).ConfigureAwait(false);
                     break;
                 case SignalRMethod.AddFinger:
                     Console.WriteLine("OnSignalRMessage AddFinger HIT2");
-                    Console.WriteLine($"uid: '{args.Item.Uid}' hex: '{BitConverter.ToString(new byte[] { (byte)args.Item.Uid }) }'");
-                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)args.Item.Uid, (byte)args.Item.Privilage });
+                    Console.WriteLine($"uid: '{t.Item.Uid}' hex: '{BitConverter.ToString(new byte[] { (byte)t.Item.Uid }) }'");
+                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)t.Item.Uid, (byte)t.Item.Privilage }).ConfigureAwait(false);
                     break;
                 case SignalRMethod.SendConfig:
                     Console.WriteLine("OnSignalRMessage SendConfig HIT2");
-                    Console.WriteLine($"json: '{args.Item.JsonString}' ");
-                    byte[] jsonBytes = ASCIIEncoding.ASCII.GetBytes(args.Item.JsonString);
-                    await host.ExecuteControllerMethodAsync(CommandHeader.TerminalConf, jsonBytes);
+                    Console.WriteLine($"json: '{t.Item.JsonString}' ");
+                    byte[] jsonBytes = ASCIIEncoding.ASCII.GetBytes(t.Item.JsonString);
+                    await host.ExecuteControllerMethodAsync(CommandHeader.TerminalConf, jsonBytes).ConfigureAwait(false);
                     break;
                 case SignalRMethod.DeleteFingerById:
                     Console.WriteLine("OnSignalRMessage DeleteFingerById HIT2");
-                    Console.WriteLine($"port: '{args.Item.Port}' uid: '{args.Item.Uid}'");//TODO REF
-                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerDeleteId, new byte[] { (byte)args.Item.Uid, 0x00 });
+                    Console.WriteLine($"port: '{t.Item.Port}' uid: '{t.Item.Uid}'");//TODO REF
+                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerDeleteId, new byte[] { (byte)t.Item.Uid, 0x00 }).ConfigureAwait(false);
                     break;
                 case SignalRMethod.AddFingerByBle:
                     Console.WriteLine("OnSignalRMessage AddFingerByBle HIT2");
-                    Console.WriteLine($"port: '{args.Item.Port}' uid: '{args.Item.Uid}' userid: '{args.Item.UserId}' Ble: '{args.Item.BleString}'");
+                    Console.WriteLine($"port: '{t.Item.Port}' uid: '{t.Item.Uid}' userid: '{t.Item.UserId}' Ble: '{t.Item.BleString}'");
                     await EnqueueSaga(new AddFingerSaga
                     {
-                        UserBLE = args.Item.BleString,
-                        FingerId = args.Item.Uid,
-                        UserPrivilage = args.Item.Privilage,
-                        UserId=args.Item.UserId
+                        UserBLE = t.Item.BleString,
+                        FingerId = t.Item.Uid,
+                        UserPrivilage = t.Item.Privilage,
+                        UserId=t.Item.UserId
                     });
                     break;
                 case SignalRMethod.DeleteAllFingerprints:
                     Console.WriteLine("OnSignalRMessage DeleteAllFingerprints HIT2");
-                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerDeleteAll, new byte[] { 0x01, 0x00 });
+                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerDeleteAll, new byte[] { 0x01, 0x00 }).ConfigureAwait(false);
                     break;
                 case SignalRMethod.SetFingerTimeout:
                     Console.WriteLine("OnSignalRMessage SetFingerTimeout HIT2");
-                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerSetTimeout, new byte[] { (byte)args.Item.Timeout, 0x00 });
+                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerSetTimeout, new byte[] { (byte)t.Item.Timeout, 0x00 }).ConfigureAwait(false);
                     break;
                 default:Console.WriteLine("OnSignalRMessage UNexpected");
                     break;
@@ -152,34 +153,34 @@ namespace Worker.Host
 
         private async void OnCardCommandEvent(object sender, CardCommandEventArgs args)
         {
-            var res = await VerifyCard(args.Card);
+            var res = await VerifyCard(args.Card).ConfigureAwait(false);
             if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Card)
             {
                 return;
             }
             if (res)
             {
-                await host.SendResponseToTerminal(new byte[] { 0x00,0x01}, CommandHeader.Card);
+                await host.SendResponseToTerminal(new byte[] { 0x00,0x01}, CommandHeader.Card).ConfigureAwait(false);
             }
             else
             {
-                await host.SendResponseToTerminal(new byte[] { 0x00, 0x00 }, CommandHeader.Card);
+                await host.SendResponseToTerminal(new byte[] { 0x00, 0x00 }, CommandHeader.Card).ConfigureAwait(false);
             }
         }
 
         private async void OnFingerCommandEvent(object sender, FingerCommandEventArgs args)
         {
-            var res = await VerifyFinger(args.Finger);
+            var res = await VerifyFinger(args.Finger).ConfigureAwait(false);
             if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Finger)
             {
                 return;
             }
             if (res)
             {
-                await host.SendResponseToTerminal(new byte[] { 0x00, 0x01 }, CommandHeader.Finger);
+                await host.SendResponseToTerminal(new byte[] { 0x00, 0x01 }, CommandHeader.Finger).ConfigureAwait(false);
             }
             else{
-                await host.SendResponseToTerminal(new byte[] { 0x00, 0x00 }, CommandHeader.Finger);
+                await host.SendResponseToTerminal(new byte[] { 0x00, 0x00 }, CommandHeader.Finger).ConfigureAwait(false);
             }
         }
 
@@ -190,7 +191,7 @@ namespace Worker.Host
                 return;
             }
             //TODO AUTH
-            await host.SendResponseToTerminal(new byte[] { 0x00, 0x01 }, CommandHeader.Ble);
+            await host.SendResponseToTerminal(new byte[] { 0x00, 0x01 }, CommandHeader.Ble).ConfigureAwait(false);
             if (!(FSaga is null) && FSaga.IsFired==true && FSaga.IsCompleted==false)
             {
                 Console.WriteLine("BLE auth with Saga");
@@ -199,7 +200,7 @@ namespace Worker.Host
                 //if (FSaga.UserBLE == bleStr)
                 if (true)
                 {
-                    FSaga.CompleteBle(host, FSaga.FingerId, FSaga.UserPrivilage);
+                    _ = FSaga.CompleteBle(host, FSaga.FingerId, FSaga.UserPrivilage);
                     //Saga = saga;
                 }
             }

@@ -96,14 +96,14 @@ namespace Worker.Host.Transports
         private async void EnqueueOutputMessageAction(object sender, MessageQueueEnqueueEventArgs<byte[]> args)
         {
             var msg=OutputQueue.Dequeue();
-            await WriteMessageAsync(msg);
+            await WriteMessageAsync(msg).ConfigureAwait(false);
         }
-        private void PinChangedAction(object sender, SerialPinChangedEventArgs e)
+        private async void PinChangedAction(object sender, SerialPinChangedEventArgs e)
         {
             logger.LogInformation($"Port {port.PortName} pin changed: {e.ToString()}");
         }
 
-        private void ErrorReceivedAction(object sender, SerialErrorReceivedEventArgs e)
+        private async void ErrorReceivedAction(object sender, SerialErrorReceivedEventArgs e)
         {
             logger.LogInformation($"Port {port.PortName} erorr: {e.ToString()}");
         }
@@ -111,7 +111,7 @@ namespace Worker.Host.Transports
         private async void DataReceivedAction(object sender, SerialDataReceivedEventArgs e)
         {
             logger.LogInformation("DataReceived Action raised");
-            await ReadMessageAsync();
+            await ReadMessageAsync().ConfigureAwait(false);
         }
         /// <summary>
         /// Читает сообщение и добавляет построчно в InputQueue
@@ -212,19 +212,19 @@ namespace Worker.Host.Transports
                 {
                     while (serial_read)
                     {
-                        await Task.Delay(50);
+                        await Task.Delay(50).ConfigureAwait(false);
                     }
                     if (port.IsRS485)
                     {
                         stream.RtsEnable = false;
-                        await Task.Delay(50);
+                        await Task.Delay(50).ConfigureAwait(false);
                     }
                    // stream.Write(message);
                     stream.Write(message, 0, message.Length);
                    
                     if (port.IsRS485)
                     {
-                        await Task.Delay(50);
+                        await Task.Delay(50).ConfigureAwait(false);
                         stream.RtsEnable = true;
                     }
                     var bytes = stream.BytesToWrite;

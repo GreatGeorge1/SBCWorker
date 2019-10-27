@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Protocol
 {
     public static class RequestMiddleware
     {
-        public static bool Process(byte[] message, out Message resMsg)
+        public static Message Process(byte[] message)
         {
             var executedMethod = new ExecutedMethod();
             if (IsValid(message))
@@ -27,14 +28,14 @@ namespace Protocol
                             var value = message.Skip(4).Take(message[3]).ToArray();
                             //  var strValue = Encoding.ASCII.GetString(value);
                             executedMethod.CommandValue = value;
-                            resMsg = new Message(methodInfo, value, mtype);
-                            return true;
+                           // resMsg = new Message(methodInfo, value, mtype);
+                            return new Message(methodInfo, value, mtype);
                         }
                     }
                 }
             }
-            resMsg = new Message(new Method(),new byte[0] { }, MessageType.NotSet);
-            return false;
+            Message resMsg = new Message(new Method(),new byte[0] { }, MessageType.NotSet, false);
+            return resMsg;
         }
         
         private static bool IsValid(byte[] message)
@@ -114,14 +115,16 @@ namespace Protocol
 
     public class Message
     {
+        public bool IsValid { get; set; } = true;
         public Method Method { get; private set; }
         public byte[] Value { get; private set; }
         public MessageType Type { get; private set; }
-        public Message(Method method, byte[] value, MessageType mtype)
+        public Message(Method method, byte[] value, MessageType mtype, bool valid = true)
         {
             Method = method;
             Value = value;
             Type = mtype;
+            IsValid = valid;
         }
     }
 

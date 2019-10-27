@@ -9,7 +9,7 @@ using Protocol;
 
 namespace Worker.Host
 {
-    public partial class Listener
+    public partial class Listener<QueueT>
     {
         private async Task<bool> VerifyCard(byte[] card)
         {
