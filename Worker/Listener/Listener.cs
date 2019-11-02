@@ -50,12 +50,13 @@ namespace Worker.Host
         private readonly Protocol.Host host;
         private readonly string PortName;
         private readonly MessageQueue<QueueT> inputQueue;
+        private readonly MessageQueue<dynamic> outputQueue;
 
         private AddFingerSaga FSaga = null;
         private readonly Queue<AddFingerSaga> SagaQueue = new Queue<AddFingerSaga>();
 
         public Listener(ILogger logger, SerialConfig port,
-           ControllerDbContext dbcontext, MessageQueue<QueueT> inputQueue)
+           ControllerDbContext dbcontext, MessageQueue<QueueT> inputQueue, MessageQueue<dynamic> outputQueue)
         {
             PortName = port.PortName;
             this.logger = logger;
@@ -64,8 +65,10 @@ namespace Worker.Host
             host.CardCommandEvent += OnCardCommandEvent;
             host.FingerCommandEvent += OnFingerCommandEvent;
             host.BleCommandEvent += OnBleCommandEvent;
+            host.GetConfigEvent += OnGetConfigEvent;
 
             this.inputQueue = inputQueue;
+            this.outputQueue = outputQueue;
             inputQueue.EnqueueEvent += OnSignalRMessage;
         }
 
@@ -97,6 +100,7 @@ namespace Worker.Host
             }
         }
 
+      
         public async void OnSignalRMessage(object sender, MessageQueueEnqueueEventArgs<QueueT> args)
         {
             //if (PortName != args.Item.Port)
@@ -107,9 +111,14 @@ namespace Worker.Host
             dynamic t = args;
             var item = inputQueue.Dequeue();//govno
             switch(t.Item.Method){
+                case SignalRMethod.GetConfig:
+                    Console.WriteLine("OnSignalRMessage GetConfig HIT2");
+                    await host.ExecuteControllerMethodAsync(CommandHeader.TerminalSysInfo, new byte[] { 0x00, 0x00 }, (string)t.Item.Address).ConfigureAwait(false);
+
+                    break;
                 case SignalRMethod.GetFingerTimeoutCurrent:
                     Console.WriteLine("OnSignalRMessage GetFingerTimeoutCurrent HIT2");       
-                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerTimeoutCurrent, new byte[] { }).ConfigureAwait(false);
+                    await host.ExecuteControllerMethodAsync(CommandHeader.FingerTimeoutCurrent, new byte[] { 0x00, 0x00 }).ConfigureAwait(false);
                     break;
                 case SignalRMethod.AddFinger:
                     Console.WriteLine("OnSignalRMessage AddFinger HIT2");
@@ -149,6 +158,12 @@ namespace Worker.Host
                 default:Console.WriteLine("OnSignalRMessage UNexpected");
                     break;
             }
+        }
+
+        public async void OnGetConfigEvent(object sender, GetConfigEventArgs args)
+        {
+            Console.WriteLine($"OnGetConfigEvent Hit jsonLength:'{args.Json.Length}' address:'{args.Address}'");
+            outputQueue.Enqueue(new SignalRresponse{ JsonString= Encoding.UTF8.GetString(args.Json), Method=SignalRMethod.GetConfig, Address=args.Address, Port=PortName});
         }
 
         private async void OnCardCommandEvent(object sender, CardCommandEventArgs args)

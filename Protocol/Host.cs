@@ -50,7 +50,7 @@ namespace Protocol
         /// </summary>
         private protected ExecutedMethod executedMethod { get; set; }
         private protected readonly IByteTransport transport;
-        private protected bool IsLive=true;
+        private protected bool IsLive = true;
 
         public ExecutedMethod ExecutedMethod
         {
@@ -83,19 +83,19 @@ namespace Protocol
             executedMethod.PropertyChanged += OnExecuteMethodChange;
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
             executedMethod.RepeatLimit = 3;
-           // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
+            // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
         }
 
         public ExecutedMethod PrepareExecutedMethod(CommandHeader command)
         {
             Method methodInfo;
-            var flag=Static.GetMethods().TryGetValue(command, out methodInfo);
-            if (flag==false || methodInfo is null)
+            var flag = Static.GetMethods().TryGetValue(command, out methodInfo);
+            if (flag == false || methodInfo is null)
             {
-                logger.LogCritical("methodInfo is null, panic");
-                flag=Static.GetMethods().TryGetValue(command, out methodInfo);
-                if(flag==false || methodInfo is null)
+                Console.WriteLine("methodInfo is null, panic");
+                flag = Static.GetMethods().TryGetValue(command, out methodInfo);
+                if (flag == false || methodInfo is null)
                 {
                     logger.LogCritical("methodInfo is null, insult");
                     throw new ArgumentNullException(nameof(methodInfo));
@@ -106,31 +106,35 @@ namespace Protocol
             return executedMethod;
         }
 
-        public void ExecuteMethod (ExecutedMethod method)
+        public void ExecuteMethod(ExecutedMethod method)
         {
-        //    Protocol.GetMethods().TryGetValue(command, out methodInfo);
+            //    Protocol.GetMethods().TryGetValue(command, out methodInfo);
             executedMethod = null;
             executedMethod = method;
             if (executedMethod is null) {
-                logger.LogCritical("method is null, heartattack");
+                Console.WriteLine("method is null, heartattack");
                 return;
             }
             executedMethod.PropertyChanged += OnExecuteMethodChange;
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
             executedMethod.RepeatLimit = 3;
-           // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
+            // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{method.MethodInfo.CommandHeader.GetDisplayName()}");
         }
 
-        public async Task<bool> ExecuteControllerMethodAsync(CommandHeader header, byte[] value)
+        public async Task<bool> ExecuteControllerMethodAsync(CommandHeader header, byte[] value,string address=null)
         {
-            if(executedMethod is null)
+            if (executedMethod is null)
             {
-                var exMethod=PrepareExecutedMethod(header);
+                var exMethod = PrepareExecutedMethod(header);
                 exMethod.CommandValue = value;
-                if(exMethod is null)
+                if (!(String.IsNullOrEmpty(address)))
                 {
-                    logger.LogCritical("exMethod is null, brain cancer");
+                    exMethod.ResponseAddress = address;
+                }
+                if (exMethod is null)
+                {
+                    Console.WriteLine("exMethod is null, brain cancer");
                     return false;
                 }
                 ExecuteMethod(exMethod);
@@ -138,18 +142,22 @@ namespace Protocol
             }
             else
             {
-                while(executedMethod.IsCompleted != true)
+                while (executedMethod.IsCompleted != true)
                 {
                     Console.WriteLine("Waiting to execute method");
                     await Task.Delay(50).ConfigureAwait(false);
                 }
                 var exMethod = PrepareExecutedMethod(header);
-                if(exMethod is null)
+                if (exMethod is null)
                 {
-                    logger.LogCritical("exMethod is null, brain cancer");
+                    Console.WriteLine("exMethod is null, brain cancer");
                     return false;
                 }
                 exMethod.CommandValue = value;
+                if (!(String.IsNullOrEmpty(address)))
+                {
+                    exMethod.ResponseAddress = address;
+                }
                 ExecuteMethod(exMethod);
                 return await ProcessControllerMethodAsync().ConfigureAwait(false);
             }
@@ -160,11 +168,19 @@ namespace Protocol
             var list = new List<byte>();
             switch (executedMethod.MethodInfo.CommandHeader)
             {
-                case CommandHeader.FingerTimeoutCurrent:     
+                case CommandHeader.FingerTimeoutCurrent:
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
-                        await transport.WriteMessageAsync(new byte[] { 0x02, 0xd5,(byte)CommandHeader.FingerTimeoutCurrent, 0x01, 0x02,0x00,0x01}).ConfigureAwait(false);
+                        await transport.WriteMessageAsync(new byte[] 
+                        { 
+                            0x02, 
+                            0xd5, 
+                            (byte)CommandHeader.FingerTimeoutCurrent, 
+                            RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
+                            (byte)ExecutedMethod.CommandValue.Length,
+                            0x00
+                        }).ConfigureAwait(false);
                         executedMethod.RepeatCount++;
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
@@ -172,15 +188,15 @@ namespace Protocol
                     break;
                 case CommandHeader.FingerWriteInBase:
                     list = new List<byte>();
-                    list.AddRange(new byte[] { 
-                        0x02, 
+                    list.AddRange(new byte[] {
+                        0x02,
                         0xd5,
                         (byte)CommandHeader.FingerWriteInBase,
                         RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
                         (byte)ExecutedMethod.CommandValue.Length
                     });
                     list.AddRange(ExecutedMethod.CommandValue);
-              
+
                     var msg = list.ToArray();
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerWriteInBase)
                     {
@@ -213,6 +229,27 @@ namespace Protocol
                     }
                     return true;
                     break;
+                case CommandHeader.TerminalSysInfo:
+                    list = new List<byte>();
+                    list.AddRange(new byte[] {
+                        0x02,
+                        0xd5,
+                        (byte)CommandHeader.TerminalSysInfo,
+                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
+                        (byte)ExecutedMethod.CommandValue.Length,
+                    });
+                    list.AddRange(ExecutedMethod.CommandValue);
+                    var msg111 = list.ToArray();
+                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalSysInfo)
+                    {
+                        Console.WriteLine("TerminalConf switch case");
+                        Console.WriteLine(BitConverter.ToString(msg111));
+                        await transport.WriteMessageAsync(msg111).ConfigureAwait(false);
+                        executedMethod.RepeatCount++;
+                        await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+                    }
+                    return true;
+                    break;
                 case CommandHeader.FingerDeleteId:
                     list = new List<byte>();
                     list.AddRange(new byte[] {
@@ -224,7 +261,7 @@ namespace Protocol
                     });
                     list.AddRange(ExecutedMethod.CommandValue);
                     var msg2 = list.ToArray();
-                    while (executedMethod.IsCompleted==false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerDeleteId)
+                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerDeleteId)
                     {
                         Console.WriteLine("FingerDeleteId  loop");
                         Console.WriteLine(BitConverter.ToString(msg2));
@@ -280,6 +317,14 @@ namespace Protocol
             return false;
         }
         #region protocol host events
+        public delegate void GetConfigEventHandler(object sender, GetConfigEventArgs e);
+        public event GetConfigEventHandler GetConfigEvent;
+        protected void PushGetConfigEvent(byte[] json, string address)
+        {
+            GetConfigEvent?.Invoke(this, new GetConfigEventArgs(json, address));
+        }
+ 
+
         public delegate void CardCommandEventHandler(object sender, CardCommandEventArgs e);
         public event CardCommandEventHandler CardCommandEvent;
         protected void PushCardCommandEvent(byte[] card)
@@ -382,6 +427,10 @@ namespace Protocol
                                 ///TODO validation
                                 if (executedMethod.MethodInfo.DirectionTo == Direction.Terminal)
                                 {
+                                    if (executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalSysInfo)
+                                    {
+                                        PushGetConfigEvent(message.Value, executedMethod.ResponseAddress);
+                                    }
                                     executedMethod.IsCompleted = true;
                                 }
                                 break;

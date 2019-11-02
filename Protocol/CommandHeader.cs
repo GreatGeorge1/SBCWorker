@@ -25,8 +25,11 @@ namespace Protocol
         FingerDeleteAll = 0xF4,
         [Display(Name = "TERMINAL_CONF")]
         TerminalConf = 0xA1,
+        [Display(Name = "SendConfig")]
         TerminalGetConf = 0xA2,
+        [Display(Name = "GetConfig")]
         TerminalSysInfo = 0xA3,
+        [Display(Name = "NotSet")]
         NotSet = 0
     }
 }

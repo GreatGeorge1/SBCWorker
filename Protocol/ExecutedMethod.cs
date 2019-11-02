@@ -62,6 +62,7 @@ namespace Protocol
         }
 
         public int RepeatLimit { get; set; }
+        public string ResponseAddress { get; set; } //signalr
 
         public void PushError(byte[] value)
         {

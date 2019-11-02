@@ -6,6 +6,7 @@ namespace Protocol
 {
     public class MessageQueue<T>:Queue<T>
     {
+        public string Port { get; set; }//TODO govno
         public new void Enqueue(T item)
         {
             base.Enqueue(item);
@@ -15,7 +16,8 @@ namespace Protocol
 
         protected void OnEnqueueEvent(T item)
         {
-            EnqueueEvent?.Invoke(this, new MessageQueueEnqueueEventArgs<T>(item));
+            //EnqueueEvent?.Invoke(this, new MessageQueueEnqueueEventArgs<T>(item));
+            EnqueueEvent?.Invoke(this, new MessageQueueEnqueueEventArgs<T>(item, Port));
         }
         public delegate void CustomQueueEnqueueEventHandler(object sender, MessageQueueEnqueueEventArgs<T> e);
       
@@ -27,6 +29,13 @@ namespace Protocol
             Item = item;
         }
 
+        public MessageQueueEnqueueEventArgs(T item, String port)
+        {
+            Item = item;
+            Port = port;
+        }
+
+        public string Port { get; set; }
         public T Item { get; set; }
     }
 

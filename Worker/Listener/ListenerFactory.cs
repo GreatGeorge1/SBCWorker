@@ -18,18 +18,18 @@ namespace Worker.Host
             _serviceProvider = serviceProvider;
             _serviceScopeFactory = serviceScopeFactory;
         }
-        public Listener<SignalRMessage> NewListener(SerialConfig port, MessageQueue<SignalRMessage> inputQueue)
-        {
-            var logger = _serviceProvider.GetService<ILogger<Listener>>();
-            var context = _serviceProvider.GetService<ControllerDbContext>();
-            return new Listener<SignalRMessage>(logger, port, context, inputQueue);
-        }
+        //public Listener<SignalRMessage> NewListener(SerialConfig port, MessageQueue<SignalRMessage> inputQueue)
+        //{
+        //    var logger = _serviceProvider.GetService<ILogger<Listener>>();
+        //    var context = _serviceProvider.GetService<ControllerDbContext>();
+        //    return new Listener<SignalRMessage>(logger, port, context, inputQueue);
+        //}
 
-        public Listener<dynamic> NewListener(SerialConfig port, MessageQueue<dynamic> inputQueue)
+        public Listener<dynamic> NewListener(SerialConfig port, MessageQueue<dynamic> inputQueue, MessageQueue<dynamic> outputQueue)
         {
             var logger = _serviceProvider.GetService<ILogger<Listener>>();
             var context = _serviceProvider.GetService<ControllerDbContext>();
-            return new Listener<dynamic>(logger, port, context, inputQueue);
+            return new Listener<dynamic>(logger, port, context, inputQueue, outputQueue);
         }
     }
 }
