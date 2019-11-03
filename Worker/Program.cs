@@ -42,15 +42,15 @@ namespace Worker.Host
                 configLogging.AddConsole();
                 configLogging.AddDebug();
             })
-            .ConfigureServices(services =>
+            .ConfigureServices((hostContext, services) =>
             {
-                var configBuilder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: true);
-                var config = configBuilder.Build();
+                //var configBuilder = new ConfigurationBuilder()
+                //.SetBasePath(Directory.GetCurrentDirectory())
+                //.AddJsonFile("appsettings.json", optional: true);
+                //var config = configBuilder.Build();
 
                // var migrationsAssembly = typeof(Program).GetTypeInfo().Assembly.GetName().Name;
-                var connectingString = config.GetConnectionString("DefaultConnection");
+                var connectingString = hostContext.Configuration.GetConnectionString("DefaultConnection");
 
                 services.AddDbContext<ControllerDbContext>(opt =>
                 {
@@ -58,18 +58,19 @@ namespace Worker.Host
                        // d => d.MigrationsAssembly(migrationsAssembly));
                 });
                 services.AddSingleton<ListenerFactory>();
-                services.Configure<WorkerOptions>(config);
-               // services.Configure<SignalROptions>(config);
+                services.Configure<WorkerOptions>(hostContext.Configuration.GetSection("ListenerOptions"));
+                services.Configure<SignalROptions>(hostContext.Configuration.GetSection("SignalROptions"));
                 var options = new WorkerOptions();
-                var opt = new SignalROptions();
-                config.GetSection("SignalROptions").Bind(opt);
-                services.AddSingleton(opt);
-                config.GetSection("ListenerOptions").Bind(options);
+
+                hostContext.Configuration.GetSection("ListenerOptions").Bind(options);
                 foreach (var port in options.Ports)
                 {
                     services.AddSingleton(new SerialConfig(port.PortName,port.IsRS485));
                 }
-                services.AddSingleton<ServerSignalRClient>();
+                services.AddSingleton<InputMessageQueue>();
+                services.AddSingleton<OutputMessageQueue>();
+
+                services.AddHostedService<SignalRService>();
                 services.AddHostedService<ListenerHost>();
 
             }).Build();

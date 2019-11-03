@@ -42,21 +42,21 @@ namespace Worker.Host
         public bool FingerWriteIsCompleted { get; set;  }= false;//step 2
     }
 
-    public partial class Listener<QueueT> 
+    public partial class Listener<QueueT> : BackgroundService
     {
         private readonly ILogger logger;
         private readonly ControllerDbContext context;
         // private readonly SerialConfig port;
         private readonly Protocol.Host host;
         private readonly string PortName;
-        private readonly MessageQueue<QueueT> inputQueue;
-        private readonly MessageQueue<dynamic> outputQueue;
+        private readonly MessageQueue<SignalRMessage> inputQueue;
+        private readonly MessageQueue<SignalRresponse> outputQueue;
 
         private AddFingerSaga FSaga = null;
         private readonly Queue<AddFingerSaga> SagaQueue = new Queue<AddFingerSaga>();
 
         public Listener(ILogger logger, SerialConfig port,
-           ControllerDbContext dbcontext, MessageQueue<QueueT> inputQueue, MessageQueue<dynamic> outputQueue)
+           ControllerDbContext dbcontext, MessageQueue<SignalRMessage> inputQueue, MessageQueue<SignalRresponse> outputQueue)
         {
             PortName = port.PortName;
             this.logger = logger;
@@ -72,11 +72,12 @@ namespace Worker.Host
             inputQueue.EnqueueEvent += OnSignalRMessage;
         }
 
-        public async Task EnqueueSaga(AddFingerSaga saga)
+        public Task EnqueueSaga(AddFingerSaga saga)
         {
             Console.WriteLine("EnqueueSaga");
             SagaQueue.Enqueue(saga);
             _=ProcessSaga();
+            return Task.CompletedTask;
         }
 
         public async Task ProcessSaga()
@@ -101,7 +102,7 @@ namespace Worker.Host
         }
 
       
-        public async void OnSignalRMessage(object sender, MessageQueueEnqueueEventArgs<QueueT> args)
+        public async void OnSignalRMessage(object sender, MessageQueueEnqueueEventArgs<SignalRMessage> args)
         {
             //if (PortName != args.Item.Port)
             //{
@@ -162,8 +163,8 @@ namespace Worker.Host
 
         public async void OnGetConfigEvent(object sender, GetConfigEventArgs args)
         {
-            Console.WriteLine($"OnGetConfigEvent Hit jsonLength:'{args.Json.Length}' address:'{args.Address}'");
-            outputQueue.Enqueue(new SignalRresponse{ JsonString= Encoding.UTF8.GetString(args.Json), Method=SignalRMethod.GetConfig, Address=args.Address, Port=PortName});
+            Console.WriteLine($"OnGetConfigEvent Hit json:'{Encoding.ASCII.GetString(args.Json)}' address:'{args.Address}'");
+            outputQueue.Enqueue(new SignalRresponse{ JsonString= Encoding.ASCII.GetString(args.Json), Method=SignalRMethod.GetConfig, Address=args.Address, Port=PortName});
         }
 
         private async void OnCardCommandEvent(object sender, CardCommandEventArgs args)
@@ -221,10 +222,22 @@ namespace Worker.Host
             }
         }
 
-        public Task ExecuteAsync(CancellationToken ct)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _=host.ExecuteAsync(ct);
-            return Task.CompletedTask;
+            Console.WriteLine($"Listener is starting.");
+
+            stoppingToken.Register(() =>
+                Console.WriteLine($"Listener background task is stopping."));
+
+            if(!stoppingToken.IsCancellationRequested)
+            {
+                Console.WriteLine($"Listener task doing background work.");
+
+                _ = host.StartAsync(stoppingToken);
+            }
+
+           // Console.WriteLine($"Listener background task is stopping.");
         }
+
     }
 }

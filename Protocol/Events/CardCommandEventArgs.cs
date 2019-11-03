@@ -11,6 +11,6 @@ namespace Protocol.Events
             Card = card;
         }
 
-        public readonly byte[] Card;
+        public byte[] Card { get; private set; }
     }
 }

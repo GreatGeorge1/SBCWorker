@@ -21,288 +21,52 @@ namespace Worker.Host
     {
         private readonly ILogger<ListenerHost> _logger;
         private readonly IEnumerable<SerialConfig> _ports;
-        //private readonly IOptions<WorkerOptions> _options;
         private readonly ListenerFactory _factory;
-      //  private readonly MessageQueue<SignalRMessage> inputQueue;
-        private readonly ConcurrentDictionary<string,MessageQueue<dynamic>> queueList;
-        private readonly ConcurrentDictionary<string, MessageQueue<dynamic>> outQueueList;
-        private readonly ServerSignalRClient client;
+        private readonly InputMessageQueue inputQueue;
+        private readonly OutputMessageQueue outputQueue;
 
-        public ListenerHost(ILogger<ListenerHost> logger, IEnumerable<SerialConfig> ports,ListenerFactory factory, ServerSignalRClient client)
+        public ListenerHost(ILogger<ListenerHost> logger, 
+            IEnumerable<SerialConfig> ports,
+            ListenerFactory factory, 
+            InputMessageQueue inputQueue,
+            OutputMessageQueue outputQueue)
         {
             _logger = logger;
             _ports = ports;
             _factory = factory;
-            this.client = client;
-            queueList = new ConcurrentDictionary<string,MessageQueue<dynamic>>();
-            outQueueList = new ConcurrentDictionary<string, MessageQueue<dynamic>>();
-            //inputQueue = new MessageQueue<SignalRMessage>();
-           // outputQueue = new MessageQueue<SignalRMessage>();
-        }
-
-        public async void OnSignalRresponse(object sender, MessageQueueEnqueueEventArgs<dynamic> args) 
-        {
-            MessageQueue<dynamic> queue;
-            var flag = outQueueList.TryGetValue((string)args.Port, out queue);
-            var item = queue.Dequeue();//govno
-            if (flag == true && !(queue is null))
-            {
-                switch ((SignalRMethod)item.Method)
-                {
-                    case SignalRMethod.GetConfig:
-                        Console.WriteLine("OnSignalRresponse GetConfig");
-                        await client.Connection.InvokeAsync("SendConfigResTo", (string)item.Address, (string)item.JsonString, (string)item.Port);
-                        break;
-                    default:
-                        Console.WriteLine("OnSignalRresponse deafult");
-                        break;
-                }
-            }
+            this.inputQueue = inputQueue;
+            this.outputQueue = outputQueue;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             foreach(var port in _ports)
             {
-                var tempQueue = new MessageQueue<dynamic>();
-                tempQueue.Port = port.PortName;
-                var tempOutQueue = new MessageQueue<dynamic>();
-                tempOutQueue.EnqueueEvent += OnSignalRresponse;
-                tempOutQueue.Port = port.PortName;
+                try
+                {
+                    Console.WriteLine($"PORT: {port.PortName}");
+                    MessageQueue<SignalRMessage> tempQueue;
+                    var res1= inputQueue.Dictionary.TryGetValue(port.PortName,out tempQueue);
 
-                queueList.TryAdd(port.PortName, tempQueue);
-                outQueueList.TryAdd(port.PortName, tempOutQueue);
-                Console.WriteLine($"PORT: {port.PortName}");
-                var listener = _factory.NewListener(port, tempQueue,tempOutQueue);
-                await listener.ExecuteAsync(stoppingToken).ConfigureAwait(false);
-                //await Listener.ListenPortAsync(port,_context, _logger, cancellationToken)
-           
-                //inputQueue.EnqueueEvent += listener.OnSignalRMessage;
+                    MessageQueue<SignalRresponse> tempOutQueue;
+                    var res2 = outputQueue.Dictionary.TryGetValue(port.PortName, out tempOutQueue);
 
+                    if(!res1 || !res2)
+                    {
+                        throw new NullReferenceException(nameof(IMessageQueue));
+                    }
+                    var listener = _factory.NewListener(port, tempQueue, tempOutQueue);
+                    await listener.StartAsync(stoppingToken).ConfigureAwait(false);
+                }
+                catch
+                {
+                    Console.WriteLine($"PORT: {port.PortName} init ERROR");
+                }
+                
             }
-
-            client.Connection.On<GetConfigReq>("GetConfig", req =>
-            {
-                if (req.Port is null)
-                {
-                    Console.WriteLine("req.Port is null or not exist");
-                    return;
-                }
-                Console.WriteLine($"req.Port is '{req.Port}'");
-                MessageQueue<dynamic> queue;
-                var flag = queueList.TryGetValue(req.Port, out queue);
-
-                if (flag == true && !(queue is null))
-                {
-                    queue.Enqueue(new { Port = req.Port, Method = SignalRMethod.GetConfig, Address = req.Address });
-                }
-            });
-
-            client.Connection.On<GetFingerTimeoutReq>("GetFingerTimeoutCurrent", req =>
-            {
-                Console.WriteLine("SignalR GetFingerTimeoutCurrent HIT!");
-
-                if (req.Port is null)
-                {
-                    Console.WriteLine("req.Port is null or not exist");
-                    return;
-                }
-                Console.WriteLine($"req.Port is '{req.Port}'");
-                MessageQueue<dynamic> queue;
-                var flag = queueList.TryGetValue(req.Port, out queue);
-
-                if (flag == true && !(queue is null))
-                {
-                    queue.Enqueue(new { Port = req.Port, Method = SignalRMethod.GetFingerTimeoutCurrent });
-                }
-
-            });
-
-            client.Connection.On<AddFingerReq>("AddFinger", req =>
-            {
-                Console.WriteLine("SignalR AddFinger HIT!");
-
-                if (req.Uid == 0)
-                {
-                    Console.WriteLine("req.Uid is null or 0");
-                    return;
-                }
-                if (req.Privilage == 0)
-                {
-                    Console.WriteLine("req.Privilage is null or 0");
-                    return;
-                }
-                if (req.Port is null)
-                {
-                    Console.WriteLine("req.Port is null or not exist");
-                    return;
-                }
-                Console.WriteLine($"req.Port is '{(string)req.Port}'");
-                Console.WriteLine($"uid: '{req.Uid}', privilage: '{req.Privilage}' port: '{req.Port}'");
-
-                MessageQueue<dynamic> queue;
-                var flag = queueList.TryGetValue(req.Port, out queue);
-
-                if (flag == true && !(queue is null))
-                {
-                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.AddFinger, Uid = req.Uid, Privilage = req.Privilage });
-                }
-
-            });
-
-            client.Connection.On<SendConfigReq>("SendConfig", req =>
-            {
-                Console.WriteLine("SignalR SendConfig HIT!");
-
-                if (req.JsonString is null)
-                {
-                    Console.WriteLine("req.JsonString is null or not exist");
-                    return;
-                }
-                if (req.Port is null)
-                {
-                    Console.WriteLine("req.Port is null or not exist");
-                    return;
-                }
-
-                MessageQueue<dynamic> queue;
-                var flag = queueList.TryGetValue(req.Port, out queue);
-
-                if (flag == true && !(queue is null))
-                {
-                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.SendConfig, JsonString = req.JsonString });
-                }
-
-            });
-
-            client.Connection.On<DeleteFingerByIdReq>("DeleteFingerById", req =>
-            {
-                Console.WriteLine("SignalR DeleteFingerById HIT!");
-                if (req.Port is null)
-                {
-                    Console.WriteLine("req.Port is null or not exist");
-                    return;
-                }
-                if (req.Id == 0)
-                {
-                    Console.WriteLine("req.Id is null or 0");
-                    return;
-                }
-
-                MessageQueue<dynamic> queue;
-                var flag = queueList.TryGetValue(req.Port, out queue);
-
-                if (flag == true && !(queue is null))
-                {
-                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.DeleteFingerById, Uid = req.Id });
-                }
-
-            });
-
-            client.Connection.On<AddFingerByBleReq>("AddFingerByBle", req =>
-            {
-                Console.WriteLine("SignalR AddFingerByBle HIT!");
-                if (req.Port is null)
-                {
-                    Console.WriteLine("req.Port is null or not exist");
-                    return;
-                }
-                if (req.UserId is null)
-                {
-                    Console.WriteLine("req.UserId is null or not exist");
-                    return;
-                }
-                if (req.Ble is null)
-                {
-                    Console.WriteLine("req.Ble is null or not exist");
-                    return;
-                }
-                if (req.Id == 0)
-                {
-                    Console.WriteLine("req.Id is null or 0");
-                    return;
-                }
-                if (req.Privilage == 0)
-                {
-                    Console.WriteLine("req.Privilage is null or 0");
-                    return;
-                }
-
-                MessageQueue<dynamic> queue;
-                var flag = queueList.TryGetValue(req.Port, out queue);
-
-                if (flag == true && !(queue is null))
-                {
-                    queue.Enqueue(new SignalRMessage
-                    {
-                        Port = req.Port,
-                        Method = SignalRMethod.AddFingerByBle,
-                        Uid = req.Id,
-                        UserId = req.UserId,
-                        BleString = req.Ble,
-                        Privilage = req.Privilage
-                    });
-                }
-            });
-
-            client.Connection.On<SetFingerTimeoutReq>("SetFingerTimeout", req =>
-            {
-                Console.WriteLine("SignalR SetFingerTimeout HIT!");
-                if (req.Port is null)
-                {
-                    Console.WriteLine("req.Port is null or not exist");
-                    return;
-                }
-
-                //if(req.Timeout )
-                //{
-                //    Console.WriteLine("req.Timeout is null or not exist");
-                //    return;
-                //}
-
-                MessageQueue<dynamic> queue;
-                queueList.TryGetValue(req.Port, out queue);
-
-                if (!(queue is null))
-                {
-                    queue.Enqueue(new
-                    {
-                        Method = SignalRMethod.SetFingerTimeout,
-                        Port = req.Port,
-                        Timeout = req.Timeout
-                    });
-                }
-            });
-
-            client.Connection.On<DeleteAllFingerprintsReq>("DeleteAllFingerprints", req =>
-            {
-                Console.WriteLine("SignalR DeleteAllFingerprints HIT!");
-                if (req.Port is null)
-                {
-                    Console.WriteLine("req.Port is null or not exist");
-                    return;
-                }
-
-                MessageQueue<dynamic> queue;
-                queueList.TryGetValue(req.Port, out queue);
-
-                if (!(queue is null))
-                {
-                    queue.Enqueue(new
-                    {
-                        Method = SignalRMethod.DeleteAllFingerprints,
-                        Port = req.Port
-                    });
-                }
-            });
-
-            await client.StartAsync(stoppingToken);
-            //while (!stoppingToken.IsCancellationRequested)
-            //{
-            //    _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-            //    await Task.Delay(1000, stoppingToken);
-            //}
+           
         }
+
     }
 
     public class SignalRMessage

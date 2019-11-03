@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Protocol;
 using System;
@@ -13,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Worker.Host.Transports
 {
-    public class SerialPortTransport : IByteTransport
+    public class SerialPortTransport : BackgroundService,IByteTransport
     {
         private readonly SerialConfig port;
         private SerialPort stream;
@@ -249,6 +250,21 @@ namespace Worker.Host.Transports
                 return false;
             }
             return true;
+        }
+
+        public string GetInfo()
+        {
+            return $"port:'{port.PortName}' isRs485:'{port.IsRS485.ToString()}'";
+        }
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            if (!stoppingToken.IsCancellationRequested)
+            {
+                this.Init();
+                return Task.CompletedTask;
+            }
+            return Task.CompletedTask;
         }
     }
 }

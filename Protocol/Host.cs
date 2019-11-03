@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Protocol.Events;
 using System;
@@ -14,7 +15,7 @@ namespace Protocol
         Task ExecuteAsync(CancellationToken stoppingToken);
     }
 
-    public class Host : IHost
+    public class Host : BackgroundService
     {
         public Host(IByteTransport transport, ILogger logger = null)
         {
@@ -30,11 +31,15 @@ namespace Protocol
             }
         }
 
-        public Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            if (!(transport.Init()))
+            if (!stoppingToken.IsCancellationRequested)
             {
-                throw new Exception("failed to init transport");
+                if (!(transport.Init()))
+                {
+                    throw new TransportInitException($"failed to init transport\r\n info:'{transport.GetInfo()}'");
+                }
+                return Task.CompletedTask;
             }
             return Task.CompletedTask;
         }
@@ -83,7 +88,6 @@ namespace Protocol
             executedMethod.PropertyChanged += OnExecuteMethodChange;
             executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
             executedMethod.RepeatLimit = 3;
-            // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
         }
 
@@ -97,8 +101,8 @@ namespace Protocol
                 flag = Static.GetMethods().TryGetValue(command, out methodInfo);
                 if (flag == false || methodInfo is null)
                 {
-                    logger.LogCritical("methodInfo is null, insult");
-                    throw new ArgumentNullException(nameof(methodInfo));
+                    Console.WriteLine("methodInfo is null, insult");
+                    throw new NullReferenceException(nameof(methodInfo));
                 }
             }
             //executedMethod = null;
@@ -144,7 +148,7 @@ namespace Protocol
             {
                 while (executedMethod.IsCompleted != true)
                 {
-                    Console.WriteLine("Waiting to execute method");
+                   // Console.WriteLine("Waiting to execute method");
                     await Task.Delay(50).ConfigureAwait(false);
                 }
                 var exMethod = PrepareExecutedMethod(header);
@@ -413,21 +417,27 @@ namespace Protocol
                         switch (message.Type)
                         {
                             case MessageType.ACK:
-                                if (ExecutedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
+                                if (!executedMethod.IsCompleted && executedMethod.MethodInfo.CommandHeader==message.Method.CommandHeader)
                                 {
-                                    await Task.Delay(TimeSpan.FromSeconds(25)).ConfigureAwait(false);
-                                }
-                                executedMethod.IsCompleted = true;
+                                    if (ExecutedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
+                                    {
+                                        await Task.Delay(TimeSpan.FromSeconds(25)).ConfigureAwait(false);
+                                    }
+                                    executedMethod.IsCompleted = true;
+                                }   
                                 break;
                             case MessageType.NACK:
-                                executedMethod.PushError(message.Value);     
+                                if (!executedMethod.IsCompleted && executedMethod.MethodInfo.CommandHeader == message.Method.CommandHeader)
+                                {
+                                    executedMethod.PushError(message.Value);
+                                }     
                                 break;
                             case MessageType.RES:
-                                executedMethod.ResponseValue = message.Value;
                                 ///TODO validation
-                                if (executedMethod.MethodInfo.DirectionTo == Direction.Terminal)
+                                if (executedMethod.MethodInfo.CommandHeader == message.Method.CommandHeader)
                                 {
-                                    if (executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalSysInfo)
+                                    executedMethod.ResponseValue = message.Value;
+                                    if (!executedMethod.IsCompleted && executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalSysInfo)
                                     {
                                         PushGetConfigEvent(message.Value, executedMethod.ResponseAddress);
                                     }
@@ -485,7 +495,20 @@ namespace Protocol
             }
             return false;
         }
+    }
 
+    public class TransportInitException : Exception
+    {
+        public TransportInitException(string message) : base(message)
+        {
+        }
 
+        public TransportInitException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
+
+        public TransportInitException()
+        {
+        }
     }
 }

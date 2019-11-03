@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Protocol
@@ -15,6 +16,11 @@ namespace Protocol
         public MessageQueue<byte[]> InputQueue { get; set; }
         public MessageQueue<byte[]> OutputQueue { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
+        public string GetInfo()
+        {
+            throw new NotImplementedException();
+        }
+
         public bool Init()
         {
             Console.WriteLine("Test transport init");
@@ -22,6 +28,16 @@ namespace Protocol
         }
 
         public Task ReadMessageAsync()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
         }

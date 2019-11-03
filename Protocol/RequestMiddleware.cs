@@ -25,7 +25,7 @@ namespace Protocol
                         executedMethod.MethodInfo = methodInfo;
                         if (IsValidCheckSum(message, out _))
                         {
-                            var value = message.Skip(4).Take(message[3]).ToArray();
+                            var value = message.Skip(5).Take(message[4]).ToArray();
                             //  var strValue = Encoding.ASCII.GetString(value);
                             executedMethod.CommandValue = value;
                            // resMsg = new Message(methodInfo, value, mtype);

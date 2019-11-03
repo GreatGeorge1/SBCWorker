@@ -1,0 +1,10 @@
+﻿{
+  "profiles": {
+    "NewHost": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

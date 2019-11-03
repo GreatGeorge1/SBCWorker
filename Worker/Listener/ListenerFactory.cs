@@ -25,7 +25,7 @@ namespace Worker.Host
         //    return new Listener<SignalRMessage>(logger, port, context, inputQueue);
         //}
 
-        public Listener<dynamic> NewListener(SerialConfig port, MessageQueue<dynamic> inputQueue, MessageQueue<dynamic> outputQueue)
+        public Listener<dynamic> NewListener(SerialConfig port, MessageQueue<SignalRMessage> inputQueue, MessageQueue<SignalRresponse> outputQueue)
         {
             var logger = _serviceProvider.GetService<ILogger<Listener>>();
             var context = _serviceProvider.GetService<ControllerDbContext>();
