@@ -58,7 +58,7 @@ namespace Worker.Host
         public bool FingerWriteIsCompleted { get; set;  }= false;//step 2
     }
 
-    public partial class Listener<QueueT> : BackgroundService
+    public partial class Listener<QueueT>
     {
         private readonly ILogger logger;
         private readonly ControllerDbContext context;
@@ -237,23 +237,6 @@ namespace Worker.Host
                     //Saga = saga;
                 }
             }
-        }
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            Console.WriteLine($"Listener is starting.");
-
-            stoppingToken.Register(() =>
-                Console.WriteLine($"Listener background task is stopping."));
-
-            if(!stoppingToken.IsCancellationRequested)
-            {
-                Console.WriteLine($"Listener task doing background work.");
-
-                await host.StartAsync(stoppingToken).ConfigureAwait(false);
-            }
-
-           // Console.WriteLine($"Listener background task is stopping.");
         }
 
     }

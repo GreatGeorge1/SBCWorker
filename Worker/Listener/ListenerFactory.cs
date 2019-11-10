@@ -23,11 +23,11 @@ namespace Worker.Host
         //    return new Listener<SignalRMessage>(logger, port, context, inputQueue);
         //}
 
-        public Listener<dynamic> NewListener(SerialConfig port, ConcurrentMessageBag<SignalRMessage> inputQueue, ConcurrentMessageBag<SignalRresponse> outputQueue)
+        public Listener<byte[]> NewListener(SerialConfig port, ConcurrentMessageBag<SignalRMessage> inputQueue, ConcurrentMessageBag<SignalRresponse> outputQueue)
         {
-            var logger = _serviceProvider.GetService<ILogger<Listener>>();
+            var logger = _serviceProvider.GetService<ILogger<Listener<byte[]>>>();
             var context = _serviceProvider.GetService<ControllerDbContext>();
-            return new Listener<dynamic>(logger, port, context, inputQueue, outputQueue);
+            return new Listener<byte[]>(logger, port, context, inputQueue, outputQueue);
         }
     }
 }

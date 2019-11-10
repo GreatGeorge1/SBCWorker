@@ -15,7 +15,7 @@ namespace Protocol
         Task ExecuteAsync(CancellationToken stoppingToken);
     }
 
-    public class Host : BackgroundService
+    public class Host 
     {
         public Host(IByteTransport transport, ILogger logger = null)
         {
@@ -33,19 +33,10 @@ namespace Protocol
             {
                 this.Logger = new NullLogger<Host>();
             }
-        }
-
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            if (!stoppingToken.IsCancellationRequested)
+            if (!(transport.Init()))
             {
-                if (!(transport.Init()))
-                {
-                    throw new TransportInitException($"failed to init transport\r\n info:'{transport.GetInfo()}'");
-                }
-                return Task.CompletedTask;
+                throw new TransportInitException($"failed to init transport\r\n info:'{transport.GetInfo()}'");
             }
-            return Task.CompletedTask;
         }
 
         private protected ILogger Logger { get; set; }
@@ -60,6 +51,7 @@ namespace Protocol
         private protected ExecutedMethod executedMethod { get; set; }
         private protected readonly IByteTransport transport;
         private protected bool IsLive = true;
+        private readonly object _lock = new object();
 
         public ExecutedMethod ExecutedMethod
         {
@@ -70,14 +62,20 @@ namespace Protocol
 
         public async Task<bool> SendResponseToTerminal(byte[] result, CommandHeader command)
         {
-            executedMethod.ResponseValue = result;
+            lock (_lock)
+            {
+                executedMethod.ResponseValue = result;
+            }
             var response = executedMethod.CreateResponse(result);
             var res = false;
             while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == command)
             {
-                res = await transport.WriteMessageAsync(response).ConfigureAwait(false);
+                res = transport.WriteMessage(response);
                 Console.WriteLine($"Response sent: '{BitConverter.ToString(response)}'");
-                executedMethod.RepeatCount++;
+                lock (_lock)
+                {
+                    executedMethod.RepeatCount++;
+                }
                 await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
             }
             return res;
@@ -86,11 +84,13 @@ namespace Protocol
         public void ExecuteMethod(CommandHeader command)
         {
             Data.GetMethods().TryGetValue(command, out Method methodInfo);
-            executedMethod = null;
-            executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
-            executedMethod.PropertyChanged += OnExecuteMethodChange;
-            executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
-            executedMethod.RepeatLimit = 3;
+            lock (_lock)
+            {
+                executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
+                executedMethod.PropertyChanged += OnExecuteMethodChange;
+                executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
+                executedMethod.RepeatLimit = 3;
+            }
             Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
         }
 
@@ -108,22 +108,28 @@ namespace Protocol
                 }
             }
             //executedMethod = null;
-            executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
+            lock (_lock)
+            {
+                executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
+            }
             return executedMethod;
         }
 
         public void ExecuteMethod(ExecutedMethod method)
         {
             //    Protocol.GetMethods().TryGetValue(command, out methodInfo);
-            executedMethod = null;
-            executedMethod = method;
-            if (executedMethod is null) {
-                Console.WriteLine("method is null, heartattack");
-                return;
+            lock (_lock)
+            {
+                executedMethod = method;
+                if (executedMethod is null)
+                {
+                    Console.WriteLine("method is null, heartattack");
+                    return;
+                }
+                executedMethod.PropertyChanged += OnExecuteMethodChange;
+                executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
+                executedMethod.RepeatLimit = 3;
             }
-            executedMethod.PropertyChanged += OnExecuteMethodChange;
-            executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
-            executedMethod.RepeatLimit = 3;
             // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{method.MethodInfo.CommandHeader.GetDisplayName()}");
         }
@@ -169,6 +175,19 @@ namespace Protocol
             }
         }
 
+
+        private static byte[] PrepareMessage(MessageType type, CommandHeader header, byte[] value)
+        {
+            List<byte> bytes = new List<byte>();
+            bytes.Add(0x02);
+            bytes.Add((byte)type);
+            bytes.Add((byte)header);
+            bytes.Add(RequestMiddleware.CalCheckSum(value, value.Length));
+            bytes.AddRange(RequestMiddleware.IntToHighLow(value.Length));
+            bytes.AddRange(value);
+            return bytes.ToArray();
+        } 
+
         private async Task<bool> ProcessControllerMethodAsync()
         {
             List<byte> list = new List<byte>();
@@ -179,143 +198,103 @@ namespace Protocol
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
-                        await transport.WriteMessageAsync(new byte[] 
-                        { 
-                            0x02, 
-                            0xd5, 
-                            (byte)CommandHeader.FingerTimeoutCurrent, 
-                            RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
-                            (byte)ExecutedMethod.CommandValue.Length,
-                            0x00
-                        }).ConfigureAwait(false);
-                        executedMethod.RepeatCount++;
+                        transport.WriteMessage(PrepareMessage(MessageType.REQ, CommandHeader.FingerTimeoutCurrent, ExecutedMethod.CommandValue));
+                        lock (_lock)
+                        {
+                            executedMethod.RepeatCount++;
+                        }
+                      
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                     res=true;
                     break;
                 case CommandHeader.FingerWriteInBase:
-                    list = new List<byte>();
-                    list.AddRange(new byte[] {
-                        0x02,
-                        0xd5,
-                        (byte)CommandHeader.FingerWriteInBase,
-                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
-                        (byte)ExecutedMethod.CommandValue.Length
-                    });
-                    list.AddRange(ExecutedMethod.CommandValue);
-
-                    var msg = list.ToArray();
+                    var msg = PrepareMessage(MessageType.REQ, CommandHeader.FingerWriteInBase, ExecutedMethod.CommandValue);
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerWriteInBase)
                     {
                         Console.WriteLine("FingerWriteInBase switch case");
                         Console.WriteLine(BitConverter.ToString(msg));
-                        await transport.WriteMessageAsync(msg).ConfigureAwait(false);
-                        executedMethod.RepeatCount++;
+                        transport.WriteMessage(msg);
+                        lock (_lock)
+                        {
+                            executedMethod.RepeatCount++;
+                        }
                         await Task.Delay(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
                     }
                     res = true;
                     break;
                 case CommandHeader.TerminalConf:
-                    list = new List<byte>();
-                    list.AddRange(new byte[] {
-                        0x02,
-                        0xd5,
-                        (byte)CommandHeader.TerminalConf,
-                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
-                        (byte)ExecutedMethod.CommandValue.Length
-                    });
                     list.AddRange(ExecutedMethod.CommandValue);
-                    var msg1 = list.ToArray();
+                    var msg1 = PrepareMessage(MessageType.REQ, CommandHeader.TerminalConf, ExecutedMethod.CommandValue);
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
                     {
                         Console.WriteLine("TerminalConf switch case");
                         Console.WriteLine(BitConverter.ToString(msg1));
-                        await transport.WriteMessageAsync(msg1).ConfigureAwait(false);
-                        executedMethod.RepeatCount++;
+                        transport.WriteMessage(msg1);
+                        lock (_lock)
+                        {
+                            executedMethod.RepeatCount++;
+                        }
                         await Task.Delay(TimeSpan.FromSeconds(60)).ConfigureAwait(false);
                     }
                     res = true;
                     break;
                 case CommandHeader.TerminalSysInfo:
-                    list = new List<byte>();
-                    list.AddRange(new byte[] {
-                        0x02,
-                        0xd5,
-                        (byte)CommandHeader.TerminalSysInfo,
-                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
-                        (byte)ExecutedMethod.CommandValue.Length,
-                    });
-                    list.AddRange(ExecutedMethod.CommandValue);
-                    var msg111 = list.ToArray();
+                    var msg111 = PrepareMessage(MessageType.REQ, CommandHeader.TerminalSysInfo, ExecutedMethod.CommandValue);
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalSysInfo)
                     {
                         Console.WriteLine("TerminalConf switch case");
                         Console.WriteLine(BitConverter.ToString(msg111));
-                        await transport.WriteMessageAsync(msg111).ConfigureAwait(false);
-                        executedMethod.RepeatCount++;
+                        transport.WriteMessage(msg111);
+                        lock (_lock)
+                        {
+                            executedMethod.RepeatCount++;
+                        }
                         await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
                     }
                     res = true;
                     break;
                 case CommandHeader.FingerDeleteId:
-                    list = new List<byte>();
-                    list.AddRange(new byte[] {
-                        0x02,
-                        0xd5,
-                        (byte)CommandHeader.FingerDeleteId,
-                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
-                        (byte)ExecutedMethod.CommandValue.Length
-                    });
-                    list.AddRange(ExecutedMethod.CommandValue);
-                    var msg2 = list.ToArray();
+                    var msg2 = PrepareMessage(MessageType.REQ, CommandHeader.FingerDeleteId, ExecutedMethod.CommandValue);
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerDeleteId)
                     {
                         Console.WriteLine("FingerDeleteId  loop");
                         Console.WriteLine(BitConverter.ToString(msg2));
-                        await transport.WriteMessageAsync(msg2).ConfigureAwait(false);
-                        executedMethod.RepeatCount++;
+                        transport.WriteMessage(msg2);
+                        lock (_lock)
+                        {
+                            executedMethod.RepeatCount++;
+                        }
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                     res = true;
                     break;
                 case CommandHeader.FingerDeleteAll:
-                    list = new List<byte>();
-                    list.AddRange(new byte[] {
-                        0x02,
-                        0xd5,
-                        (byte)CommandHeader.FingerDeleteAll,
-                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
-                        (byte)ExecutedMethod.CommandValue.Length
-                    });
-                    list.AddRange(ExecutedMethod.CommandValue);
-                    var msg3 = list.ToArray();
+                    var msg3 = PrepareMessage(MessageType.REQ, CommandHeader.FingerDeleteAll, ExecutedMethod.CommandValue);
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerDeleteAll)
                     {
                         Console.WriteLine("FingerDeleteAll  loop");
                         Console.WriteLine(BitConverter.ToString(msg3));
-                        await transport.WriteMessageAsync(msg3).ConfigureAwait(false);
-                        executedMethod.RepeatCount++;
+                        transport.WriteMessage(msg3);
+                        lock (_lock)
+                        {
+                            executedMethod.RepeatCount++;
+                        }
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                     res = true;
                     break;
                 case CommandHeader.FingerSetTimeout:
-                    list = new List<byte>();
-                    list.AddRange(new byte[] {
-                        0x02,
-                        0xd5,
-                        (byte)CommandHeader.FingerSetTimeout,
-                        RequestMiddleware.CalCheckSum(ExecutedMethod.CommandValue, ExecutedMethod.CommandValue.Length),
-                        (byte)ExecutedMethod.CommandValue.Length
-                    });
-                    list.AddRange(ExecutedMethod.CommandValue);
-                    var msg4 = list.ToArray();
+                    var msg4 = PrepareMessage(MessageType.REQ, CommandHeader.FingerSetTimeout, ExecutedMethod.CommandValue);
                     while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerSetTimeout)
                     {
                         Console.WriteLine("FingerSetTimeout  loop");
                         Console.WriteLine(BitConverter.ToString(msg4));
-                        await transport.WriteMessageAsync(msg4).ConfigureAwait(false);
-                        executedMethod.RepeatCount++;
+                        transport.WriteMessage(msg4);
+                        lock (_lock)
+                        {
+                            executedMethod.RepeatCount++;
+                        }
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                     res = true;
@@ -361,8 +340,11 @@ namespace Protocol
                 throw new ArgumentNullException(nameof(args));
             }
             Logger.LogWarning($"RepeatCount ReachedLimit: {args.Count}");
-            executedMethod.IsCompleted = true;
-            executedMethod.IsError = true;
+            lock (_lock)
+            {
+                executedMethod.IsCompleted = true;
+                executedMethod.IsError = true;
+            };
         }
 
         protected async void OnExecuteMethodChange(object sender, PropertyChangedEventArgs args)
@@ -379,13 +361,19 @@ namespace Protocol
                 {
                     if(executedMethod.CommandValue!=null && executedMethod.CommandValue.Length > 0)
                     {
-                        executedMethod.IsFired = true;
+                        lock (_lock)
+                        {
+                            executedMethod.IsFired = true;
+                        };
                         _=(direction == Direction.Controller) ? ProcessTerminalMethod() : await ProcessControllerMethodAsync().ConfigureAwait(false);
                     };
                 }
                 else
                 {
-                    executedMethod.IsFired = true;
+                    lock (_lock)
+                    {
+                        executedMethod.IsFired = true;
+                    };
                     _ = (direction == Direction.Controller) ? ProcessTerminalMethod() : await ProcessControllerMethodAsync().ConfigureAwait(false);
                 }
              
@@ -438,7 +426,10 @@ namespace Protocol
                                     {
                                         await Task.Delay(TimeSpan.FromSeconds(25)).ConfigureAwait(false);
                                     }
-                                    executedMethod.IsCompleted = true;
+                                    lock (_lock)
+                                    {
+                                        executedMethod.IsCompleted = true;
+                                    };
                                 }   
                                 break;
                             case MessageType.NACK:
@@ -456,14 +447,20 @@ namespace Protocol
                                     {
                                         PushGetConfigEvent(message.Value, executedMethod.ResponseAddress);
                                     }
-                                    executedMethod.IsCompleted = true;
+                                    lock (_lock)
+                                    {
+                                        executedMethod.IsCompleted = true;
+                                    };
                                 }
                                 break;
                             case MessageType.REQ:
                                 ExecuteMethod(message.Method.CommandHeader);
                                 if (message.Method.HasCommandValue)
                                 {
-                                    executedMethod.CommandValue = message.Value;
+                                    lock (_lock)
+                                    {
+                                        executedMethod.CommandValue = message.Value;
+                                    };
                                 }
                                 break;                            
                             default:
@@ -505,13 +502,18 @@ namespace Protocol
                     break;
                 case CommandHeader.Error:
                     Console.WriteLine("Error processed");
-                    executedMethod.IsCompleted = true;
+                    lock (_lock)
+                    {
+                        executedMethod.IsCompleted = true;
+                    }
+                  
                     res = true;
                     break;
                     //case ProtocolCommands.
             }
             return res;
         }
+
     }
 
     public class TransportInitException : Exception

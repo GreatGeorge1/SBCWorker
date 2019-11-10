@@ -11,9 +11,9 @@ namespace Protocol
     {
     }
 
-    public interface ITransport<TType>:IHostedService
+    public interface ITransport<TType>
     {
-        Task<bool> WriteMessageAsync(TType input);
+        bool WriteMessage(TType input);
         /// <summary>
         /// Читает сообщение и добавляет построчно в InputQueue
         /// </summary>

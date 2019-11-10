@@ -24,6 +24,7 @@ namespace Worker.Host
         private readonly ListenerFactory _factory;
         private readonly InputMessageQueue inputQueue;
         private readonly OutputMessageQueue outputQueue;
+        private readonly List<Listener<byte[]>> listeners = new List<Listener<byte[]>>();
 
         public ListenerHost(ILogger<ListenerHost> logger, 
             IEnumerable<SerialConfig> ports,
@@ -54,7 +55,7 @@ namespace Worker.Host
                         throw new NullReferenceException(nameof(IMessageQueue));
                     }
                     var listener = _factory.NewListener(port, tempQueue, tempOutQueue);
-                    await listener.StartAsync(stoppingToken).ConfigureAwait(false);
+                    listeners.Add(listener);
                 }
                 catch
                 {
