@@ -19,7 +19,7 @@ namespace Worker.Host.Transports
         private readonly SerialConfig port;
         private SerialPort stream;
 
-        private ILogger logger { get; set; }
+        private ILogger Logger { get; set; }
         public MessageQueue<byte[]> InputQueue { get; set; }
         public MessageQueue<byte[]> OutputQueue { get; set; }
 
@@ -32,11 +32,11 @@ namespace Worker.Host.Transports
             this.port = port ?? throw new ArgumentNullException(nameof(port));
             if (logger != null)
             {
-                this.logger = logger;
+                this.Logger = logger;
             }
             else
             {
-                this.logger = new NullLogger<SerialPortTransport>();
+                this.Logger = new NullLogger<SerialPortTransport>();
             }
         }
 
@@ -44,53 +44,56 @@ namespace Worker.Host.Transports
         {
             if (!PortHelpers.PortNameExists(port.PortName))
             {
-                logger.LogCritical($"{port.PortName} not exists");
+                Logger.LogCritical($"{port.PortName} not exists");
                 //throw new Exception($"{port.PortName} not exists");
                 return false;
             }
-            stream = new SerialPort(port.PortName);
-            stream.BaudRate = 115200;
-            stream.ReadTimeout = 500;
-            stream.WriteTimeout = 500;
+            stream = new SerialPort(port.PortName)
+            {
+                BaudRate = 115200,
+                ReadTimeout = 500,
+                WriteTimeout = 500,
+                Parity = Parity.None,
+                StopBits = StopBits.One,
+                DataBits = 8,
+                Encoding = Encoding.UTF8,
+                NewLine = "\r\n"
+            };
             stream.DataReceived += DataReceivedAction;
             stream.ErrorReceived += ErrorReceivedAction;
             stream.PinChanged += PinChangedAction;
-            stream.Parity = Parity.None;
-            stream.StopBits = StopBits.One;
-            stream.DataBits = 8;
-            stream.Encoding = Encoding.UTF8;
-            stream.NewLine = "\r\n";
+           
 
             if (port.IsRS485)
             {
                 stream.Handshake = Handshake.None;
                 stream.RtsEnable = true;
-                logger.LogInformation($"Port {port.PortName} in RS485 mode");
+                Logger.LogInformation($"Port {port.PortName} in RS485 mode");
             }
 
             stream.Open();
             if (!stream.IsOpen)
             {
-                logger.LogCritical($"Error opening serial port {port.PortName}");
+                Logger.LogCritical($"Error opening serial port {port.PortName}");
                 //throw new Exception($"Error opening serial port {port.PortName}");
                 return false;
             }
-            logger.LogInformation($"Port {port.PortName} open");
+            Logger.LogInformation($"Port {port.PortName} open");
             if (stream == null)
             {
-                logger.LogCritical($"No serial port {port.PortName}");
+                Logger.LogCritical($"No serial port {port.PortName}");
                 // throw new Exception($"No serial port {port.PortName}");
                 return false;
             }
             if (stream.CtsHolding)
             {
-                logger.LogInformation($"Cts detected {port.PortName}");
+                Logger.LogInformation($"Cts detected {port.PortName}");
             }
             else
             {
-                logger.LogInformation($"Cts NOT detected {port.PortName}");
+                Logger.LogInformation($"Cts NOT detected {port.PortName}");
             }
-            logger.LogInformation($"Port listener started: {port.PortName}");
+            Logger.LogInformation($"Port listener started: {port.PortName}");
             return true;
         }
 
@@ -99,26 +102,26 @@ namespace Worker.Host.Transports
             var msg=OutputQueue.Dequeue();
             await WriteMessageAsync(msg).ConfigureAwait(false);
         }
-        private async void PinChangedAction(object sender, SerialPinChangedEventArgs e)
+        private void PinChangedAction(object sender, SerialPinChangedEventArgs e)
         {
-            logger.LogInformation($"Port {port.PortName} pin changed: {e.ToString()}");
+            Logger.LogInformation($"Port {port.PortName} pin changed: {e.ToString()}");
         }
 
-        private async void ErrorReceivedAction(object sender, SerialErrorReceivedEventArgs e)
+        private void ErrorReceivedAction(object sender, SerialErrorReceivedEventArgs e)
         {
-            logger.LogInformation($"Port {port.PortName} erorr: {e.ToString()}");
+            Logger.LogInformation($"Port {port.PortName} erorr: {e.ToString()}");
         }
 
-        private async void DataReceivedAction(object sender, SerialDataReceivedEventArgs e)
+        private void DataReceivedAction(object sender, SerialDataReceivedEventArgs e)
         {
-            logger.LogInformation("DataReceived Action raised");
-            await ReadMessageAsync().ConfigureAwait(false);
+            Logger.LogInformation("DataReceived Action raised");
+            ReadMessage();
         }
         /// <summary>
         /// Читает сообщение и добавляет построчно в InputQueue
         /// </summary>
         /// <returns></returns>
-        public async Task ReadMessageAsync()
+        public void ReadMessage()
         {
             if (serial_read)
             {
@@ -135,9 +138,9 @@ namespace Worker.Host.Transports
                     var bytes = new List<byte>();
                     do
                     {
-                        if(sw.ElapsedMilliseconds >= 2000)
+                        if (sw.ElapsedMilliseconds >= 2000)
                         {
-                            logger.LogWarning("ReadTimeout");
+                            Logger.LogWarning("ReadTimeout");
                             serial_read = false;
                             return;
                         }
@@ -146,16 +149,20 @@ namespace Worker.Host.Transports
                         {
                             _byte = (byte)stream.ReadByte();
                         }
-                        catch
+                        catch(InvalidOperationException)
+                        {
+                            continue;
+                        }
+                        catch (Exception)
                         {
                             continue;
                         }
                         list.Add(_byte);
-                    } while (stream.BytesToRead > 0 && list.Count<5);
+                    } while (stream.BytesToRead > 0 && list.Count < 5);
                     var len = list.LastOrDefault();
                     if (len == 0)
                     {
-                        logger.LogWarning("corrupted message");
+                        Logger.LogWarning("corrupted message");
                         serial_read = false;
                         return;
                     }
@@ -166,7 +173,7 @@ namespace Worker.Host.Transports
                     {
                         if (sw.ElapsedMilliseconds >= 2000)
                         {
-                            logger.LogWarning("ReadTimeout");
+                            Logger.LogWarning("ReadTimeout");
                             serial_read = false;
                             return;
                         }
@@ -181,7 +188,7 @@ namespace Worker.Host.Transports
                         }
                         bytes.Add(_byte);
                         k--;
-                    } while (stream.BytesToRead > 0 && k>0);
+                    } while (stream.BytesToRead > 0 && k > 0);
 
                     var res = bytes.ToArray();
                     string str = BitConverter.ToString(res);
@@ -191,15 +198,15 @@ namespace Worker.Host.Transports
             }
             catch (IOException ex)
             {
-                logger.LogWarning(ex.ToString());
+                Logger.LogWarning(ex.ToString());
             }
             catch (System.TimeoutException ex)
             {
-                logger.LogWarning("r:timeout");
+                Logger.LogWarning("r:timeout");
             }
             catch (InvalidOperationException ex)
             {
-                logger.LogWarning(ex.ToString());
+                Logger.LogWarning(ex.ToString());
             }
             serial_read = false;
             return;
@@ -230,12 +237,12 @@ namespace Worker.Host.Transports
                     }
                     var bytes = stream.BytesToWrite;
                     var size = stream.WriteBufferSize;
-                    logger.LogInformation($"wrote to port {port.PortName}: {message}, bytes {bytes}, buff_size {size}");
+                    Logger.LogInformation($"wrote to port {port.PortName}: {message}, bytes {bytes}, buff_size {size}");
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning($"ex {port.PortName}");
-                    logger.LogWarning(ex.ToString());
+                    Logger.LogWarning($"ex {port.PortName}");
+                    Logger.LogWarning(ex.ToString());
                     if (port.IsRS485)
                     {
                         stream.RtsEnable = true;
@@ -246,7 +253,7 @@ namespace Worker.Host.Transports
             }
             else
             {
-                logger.LogCritical($"Cannot write to port: {port.PortName}, port closed");
+                Logger.LogCritical($"Cannot write to port: {port.PortName}, port closed");
                 return false;
             }
             return true;

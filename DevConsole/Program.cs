@@ -16,13 +16,13 @@ namespace DevConsole
 {
     class Program
     {
-        static ILogger log = new LoggerConfiguration()
+        static readonly ILogger log = new LoggerConfiguration()
             .WriteTo.Console()
             .CreateLogger();
         static async Task Main(string[] args)
         {
             var list = new List<ProtocolMethodView>();
-            foreach(var item in Protocol.Static.GetMethods())
+            foreach(var item in Protocol.Data.GetMethods())
             {
                 list.Add(ProtocolMethodView.MapProtocolMethod(item.Value));
             }

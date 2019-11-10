@@ -43,7 +43,7 @@ namespace Protocol
         }
 
 
-        private List<byte[]> errors;
+        private readonly List<byte[]> errors;
         public bool IsError { get; set; }
 
         private int repeatCount;
@@ -86,32 +86,30 @@ namespace Protocol
 
         protected void OnPropertyChanged(string name)
         {
-            PropertyChangedEventHandler handler = PropertyChanged;
-            if (handler != null)
-            {
-                handler(this, new PropertyChangedEventArgs(name));
-            }
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
         protected void OnRepeatCountReachedLimit(int count, int limit)
         {
 
-            RepeatCountReachedLimitEventHandler handler = RepeatCountReachedLimit;
-            if (handler != null)
-            {
-                handler(this, new RepeatCountReachedLimitArgs(count, limit));
-            }
+            RepeatCountReachedLimit?.Invoke(this, new RepeatCountReachedLimitArgs(count, limit));
         }
 
         public byte[] CreateResponse(byte[] result)
         {
-            var list = new List<byte>();
-            list.Add(0x02);
-            list.Add((byte)MessageType.RES);
-            list.Add((byte)this.MethodInfo.CommandHeader);
-            list.Add(RequestMiddleware.CalCheckSum(result, result.Length));
-            list.Add((byte)result.Length);
-            foreach(var item in result)
+            if(result is null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+            var list = new List<byte>
+            {
+                0x02,
+                (byte)MessageType.RES,
+                (byte)this.MethodInfo.CommandHeader,
+                RequestMiddleware.CalCheckSum(result, result.Length),
+                (byte)result.Length
+            };
+            foreach (var item in result)
             {
                 list.Add(item);
             }

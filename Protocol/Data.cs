@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Protocol
 {
-    public static class Static
+    public static class Data
     {
         public static Dictionary<CommandHeader, Method> GetMethods() => new Dictionary<CommandHeader, Method>{
             {CommandHeader.Card, new Method{

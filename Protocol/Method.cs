@@ -13,7 +13,7 @@ namespace Protocol
     }
 
     [AttributeUsage(AttributeTargets.Enum)]
-    public class ByteAttribute : Attribute
+    public sealed class ByteAttribute : Attribute
     {
         public int ByteValue { get; private set; }
         public ByteAttribute(int value) 

@@ -45,13 +45,11 @@ namespace Worker.Host
                 try
                 {
                     Console.WriteLine($"PORT: {port.PortName}");
-                    MessageQueue<SignalRMessage> tempQueue;
-                    var res1= inputQueue.Dictionary.TryGetValue(port.PortName,out tempQueue);
+                    var res1 = inputQueue.Dictionary.TryGetValue(port.PortName, out MessageQueue<SignalRMessage> tempQueue);
 
-                    MessageQueue<SignalRresponse> tempOutQueue;
-                    var res2 = outputQueue.Dictionary.TryGetValue(port.PortName, out tempOutQueue);
+                    var res2 = outputQueue.Dictionary.TryGetValue(port.PortName, out MessageQueue<SignalRresponse> tempOutQueue);
 
-                    if(!res1 || !res2)
+                    if (!res1 || !res2)
                     {
                         throw new NullReferenceException(nameof(IMessageQueue));
                     }

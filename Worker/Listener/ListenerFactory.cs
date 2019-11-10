@@ -11,12 +11,10 @@ namespace Worker.Host
 {
     public class ListenerFactory
     {
-        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly IServiceProvider _serviceProvider;
-        public ListenerFactory(IServiceProvider serviceProvider, IServiceScopeFactory serviceScopeFactory)
+        public ListenerFactory(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            _serviceScopeFactory = serviceScopeFactory;
         }
         //public Listener<SignalRMessage> NewListener(SerialConfig port, MessageQueue<SignalRMessage> inputQueue)
         //{

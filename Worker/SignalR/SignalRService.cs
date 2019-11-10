@@ -21,11 +21,11 @@ namespace Worker.Host.SignalR
 {
     public class SignalRService : BackgroundService
     {
-        private string Domain = "https://dev-3ru57p69.eu.auth0.com/";
-        private string Audience = "https://localhost:5001";
-        private string Secret = "idcNqrPsARQFI5qeEKOn57SwsloVN-ln1bo-R7aTo_ZTWtnEv2BGAkbuTvm7hq8J";
-        private string ClientId = "DYaPShg0nOEptG3AIeDgNBCudk7w3LhI";
-        private string ConnectionUri = "https://aa1c1efb.ngrok.io/hubs/controllerhub";
+        private readonly string Domain = "https://dev-3ru57p69.eu.auth0.com/";
+        private readonly string Audience = "https://localhost:5001";
+        private readonly string Secret = "idcNqrPsARQFI5qeEKOn57SwsloVN-ln1bo-R7aTo_ZTWtnEv2BGAkbuTvm7hq8J";
+        private readonly string ClientId = "DYaPShg0nOEptG3AIeDgNBCudk7w3LhI";
+        private readonly string ConnectionUri = "https://aa1c1efb.ngrok.io/hubs/controllerhub";
 
         private string token = null;
         private SecurityToken validatedToken = null;
@@ -69,7 +69,7 @@ namespace Worker.Host.SignalR
             connection = new HubConnectionBuilder()
                .WithUrl(ConnectionUri, options =>
                {
-                   options.AccessTokenProvider = async () => await GetAccessToken().ConfigureAwait(false);
+                   options.AccessTokenProvider =  () => Task.FromResult(GetAccessToken());
                    // options.
                })
                .WithAutomaticReconnect()
@@ -128,7 +128,7 @@ namespace Worker.Host.SignalR
             return Task.CompletedTask;
         }
 
-        public async Task<string> GetAccessToken()
+        public string GetAccessToken()
         {
             Console.WriteLine($"Token");
             JwtSecurityTokenHandler handler = new JwtSecurityTokenHandler();
@@ -184,8 +184,7 @@ namespace Worker.Host.SignalR
 
         public async void OnSignalRresponse(object sender, MessageQueueEnqueueEventArgs<SignalRresponse> args)
         {
-            MessageQueue<SignalRresponse> queue;
-            var flag = outputQueue.Dictionary.TryGetValue((string)args.Port, out queue);
+            var flag = outputQueue.Dictionary.TryGetValue((string)args.Port, out MessageQueue<SignalRresponse> queue);
             var item = queue.Dequeue();//govno
             if (flag == true && !(queue is null))
             {
@@ -212,8 +211,7 @@ namespace Worker.Host.SignalR
                     return;
                 }
                 Console.WriteLine($"req.Port is '{req.Port}'");
-                MessageQueue<SignalRMessage> queue;
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
@@ -231,8 +229,7 @@ namespace Worker.Host.SignalR
                     return;
                 }
                 Console.WriteLine($"req.Port is '{req.Port}'");
-                MessageQueue<SignalRMessage> queue;
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
@@ -263,8 +260,7 @@ namespace Worker.Host.SignalR
                 Console.WriteLine($"req.Port is '{(string)req.Port}'");
                 Console.WriteLine($"uid: '{req.Uid}', privilage: '{req.Privilage}' port: '{req.Port}'");
 
-                MessageQueue<SignalRMessage> queue;
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
@@ -288,8 +284,7 @@ namespace Worker.Host.SignalR
                     return;
                 }
 
-                MessageQueue<SignalRMessage> queue;
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
@@ -312,8 +307,7 @@ namespace Worker.Host.SignalR
                     return;
                 }
 
-                MessageQueue<SignalRMessage> queue;
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
@@ -351,8 +345,7 @@ namespace Worker.Host.SignalR
                     return;
                 }
 
-                MessageQueue<SignalRMessage> queue;
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
@@ -383,8 +376,7 @@ namespace Worker.Host.SignalR
                 //    return;
                 //}
 
-                MessageQueue<SignalRMessage> queue;
-                inputQueue.Dictionary.TryGetValue(req.Port, out queue);
+                inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
 
                 if (!(queue is null))
                 {
@@ -406,8 +398,7 @@ namespace Worker.Host.SignalR
                     return;
                 }
 
-                MessageQueue<SignalRMessage> queue;
-                inputQueue.Dictionary.TryGetValue(req.Port, out queue);
+                inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
 
                 if (!(queue is null))
                 {

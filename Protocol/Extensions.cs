@@ -16,6 +16,10 @@ namespace Protocol
         public static TAttribute GetAttribute<TAttribute>(this Enum enumValue)
                 where TAttribute : Attribute
         {
+            if(enumValue is null)
+            {
+                throw new ArgumentNullException(nameof(enumValue));
+            }
             return enumValue.GetType()
                             .GetMember(enumValue.ToString())
                             .First()

@@ -34,7 +34,22 @@ namespace Worker.Host
         public async Task CompleteBle(Protocol.Host host, int id, int privilage)
         {
             Console.WriteLine("Saga CompleteBle HIT!");
-            var res=await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)id, (byte)privilage }).ConfigureAwait(false);
+            bool res=false;
+            int i = 0;
+            while (res != true)
+            {
+                if (i >= 3)
+                {
+                    break;
+                }
+                res=await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)id, (byte)privilage });
+                i++;
+            }
+            if (i >= 3)
+            {
+                Console.WriteLine("Info: Saga is failed, can't execute method");
+                return;
+            }
             FingerWriteIsCompleted = true;
             IsCompleted = true;
             Console.WriteLine("Info: Saga is completed");
@@ -110,8 +125,8 @@ namespace Worker.Host
             //}
             //Console.WriteLine("OnSignalRMessage HIT");
             dynamic t = args;
-            var item = inputQueue.Dequeue();//govno
-            switch(t.Item.Method){
+            _ = inputQueue.Dequeue();//govno
+            switch (t.Item.Method){
                 case SignalRMethod.GetConfig:
                     Console.WriteLine("OnSignalRMessage GetConfig HIT2");
                     await host.ExecuteControllerMethodAsync(CommandHeader.TerminalSysInfo, new byte[] { 0x00, 0x00 }, (string)t.Item.Address).ConfigureAwait(false);
@@ -161,7 +176,7 @@ namespace Worker.Host
             }
         }
 
-        public async void OnGetConfigEvent(object sender, GetConfigEventArgs args)
+        public void OnGetConfigEvent(object sender, GetConfigEventArgs args)
         {
             Console.WriteLine($"OnGetConfigEvent Hit json:'{Encoding.ASCII.GetString(args.Json)}' address:'{args.Address}'");
             outputQueue.Enqueue(new SignalRresponse{ JsonString= Encoding.ASCII.GetString(args.Json), Method=SignalRMethod.GetConfig, Address=args.Address, Port=PortName});
@@ -169,7 +184,7 @@ namespace Worker.Host
 
         private async void OnCardCommandEvent(object sender, CardCommandEventArgs args)
         {
-            var res = await VerifyCard(args.Card).ConfigureAwait(false);
+            var res = await VerifyCard(args.Card);
             if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Card)
             {
                 return;
@@ -186,7 +201,7 @@ namespace Worker.Host
 
         private async void OnFingerCommandEvent(object sender, FingerCommandEventArgs args)
         {
-            var res = await VerifyFinger(args.Finger).ConfigureAwait(false);
+            var res = await VerifyFinger(args.Finger);
             if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Finger)
             {
                 return;
@@ -216,7 +231,7 @@ namespace Worker.Host
                 //if (FSaga.UserBLE == bleStr)
                 if (true)
                 {
-                    _ = FSaga.CompleteBle(host, FSaga.FingerId, FSaga.UserPrivilage);
+                    await Task.WhenAny(FSaga.CompleteBle(host, FSaga.FingerId, FSaga.UserPrivilage));
                     //Saga = saga;
                 }
             }
@@ -233,7 +248,7 @@ namespace Worker.Host
             {
                 Console.WriteLine($"Listener task doing background work.");
 
-                _ = host.StartAsync(stoppingToken);
+                await host.StartAsync(stoppingToken);
             }
 
            // Console.WriteLine($"Listener background task is stopping.");

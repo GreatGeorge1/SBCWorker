@@ -11,30 +11,31 @@ namespace Protocol
     {
         public static Message Process(byte[] message)
         {
+            if(message is null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
             var executedMethod = new ExecutedMethod();
             if (IsValid(message))
             {
-                MessageType mtype = MessageType.NotSet;
-                if (IsValidType(message, out mtype))
+                if (IsValidType(message, out MessageType mtype))
                 {
-                    CommandHeader command;
-                    if (IsValidCommand(message, out command))
+                    if (IsValidCommand(message, out CommandHeader command))
                     {
-                        Method methodInfo;
-                        Protocol.Static.GetMethods().TryGetValue(command, out methodInfo);
+                        Protocol.Data.GetMethods().TryGetValue(command, out Method methodInfo);
                         executedMethod.MethodInfo = methodInfo;
                         if (IsValidCheckSum(message, out _))
                         {
                             var value = message.Skip(5).Take(message[4]).ToArray();
                             //  var strValue = Encoding.ASCII.GetString(value);
                             executedMethod.CommandValue = value;
-                           // resMsg = new Message(methodInfo, value, mtype);
+                            // resMsg = new Message(methodInfo, value, mtype);
                             return new Message(methodInfo, value, mtype);
                         }
                     }
                 }
             }
-            Message resMsg = new Message(new Method(),new byte[0] { }, MessageType.NotSet, false);
+            Message resMsg = new Message(new Method(),Array.Empty<byte>(), MessageType.NotSet, false);
             return resMsg;
         }
         
@@ -84,6 +85,10 @@ namespace Protocol
 
         private static bool IsValidCheckSum(byte[] message, out byte newChecksum)
         {
+            if(message is null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
             try
             {
                 var temp = message[4];
@@ -95,19 +100,23 @@ namespace Protocol
                     return true;
                 }
             }
-            catch (Exception e)
+            catch (ArgumentOutOfRangeException e)
             {
-                Console.WriteLine("Not valid checksum");
+                Console.WriteLine($"Not valid message length (IsValidChecksum): {e.ToString()}");
             }
             newChecksum = 0x00; 
             return false;
         }
 
-        public static byte CalCheckSum(byte[] _PacketData, int PacketLength)
+        public static byte CalCheckSum(byte[] PacketData, int PacketLength)
         {
+            if (PacketData is null)
+            {
+                throw new ArgumentNullException(nameof(PacketData));
+            }
             Byte _CheckSumByte = 0x00;
             for (int i = 0; i < PacketLength; i++)
-                _CheckSumByte ^= _PacketData[i];
+                _CheckSumByte ^= PacketData[i];
 
             return _CheckSumByte;
         }

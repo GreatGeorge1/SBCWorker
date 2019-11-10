@@ -7,8 +7,8 @@ namespace Protocol.Events
     public class GetConfigEventArgs
     {
 
-        public readonly byte[] Json;
-        public readonly string Address;
+        public  byte[] Json { get; private set; }
+        public  string Address { get; private set; }
 
         public GetConfigEventArgs(byte[] json, string address)
         {

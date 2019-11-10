@@ -11,16 +11,16 @@ namespace Protocol
     {
     }
 
-    public interface ITransport<Ttype>:IHostedService
+    public interface ITransport<TType>:IHostedService
     {
-        Task<bool> WriteMessageAsync(Ttype input);
+        Task<bool> WriteMessageAsync(TType input);
         /// <summary>
         /// Читает сообщение и добавляет построчно в InputQueue
         /// </summary>
-        Task ReadMessageAsync();
+        void ReadMessage();
         bool Init();
-        MessageQueue<Ttype> InputQueue { get; set; }
-        MessageQueue<Ttype> OutputQueue { get; set; }
+        MessageQueue<TType> InputQueue { get; }
+        MessageQueue<TType> OutputQueue { get; }
         string GetInfo();
     }
 

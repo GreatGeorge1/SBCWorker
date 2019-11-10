@@ -19,15 +19,19 @@ namespace Protocol
     {
         public Host(IByteTransport transport, ILogger logger = null)
         {
+            if(transport is null)
+            {
+                throw new ArgumentNullException(nameof(transport));
+            }
             this.transport = transport;
             transport.InputQueue.EnqueueEvent += DataReceived;
             if (logger != null)
             {
-                this.logger = logger;
+                this.Logger = logger;
             }
             else
             {
-                this.logger = new NullLogger<Host>();
+                this.Logger = new NullLogger<Host>();
             }
         }
 
@@ -44,12 +48,12 @@ namespace Protocol
             return Task.CompletedTask;
         }
 
-        private protected ILogger logger { get; set; }
+        private protected ILogger Logger { get; set; }
 
         /// <summary>
         /// колекция методов запущенных на контроллере
         /// </summary>
-        private protected Queue<ExecutedMethod> hostedMethods { get; set; }
+        private protected Queue<ExecutedMethod> HostedMethods { get; set; }
         /// <summary>
         /// метод запущенный на терминале
         /// </summary>
@@ -81,8 +85,7 @@ namespace Protocol
 
         public void ExecuteMethod(CommandHeader command)
         {
-            Method methodInfo;
-            Static.GetMethods().TryGetValue(command, out methodInfo);
+            Data.GetMethods().TryGetValue(command, out Method methodInfo);
             executedMethod = null;
             executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
             executedMethod.PropertyChanged += OnExecuteMethodChange;
@@ -93,12 +96,11 @@ namespace Protocol
 
         public ExecutedMethod PrepareExecutedMethod(CommandHeader command)
         {
-            Method methodInfo;
-            var flag = Static.GetMethods().TryGetValue(command, out methodInfo);
+            var flag = Data.GetMethods().TryGetValue(command, out Method methodInfo);
             if (flag == false || methodInfo is null)
             {
                 Console.WriteLine("methodInfo is null, panic");
-                flag = Static.GetMethods().TryGetValue(command, out methodInfo);
+                flag = Data.GetMethods().TryGetValue(command, out methodInfo);
                 if (flag == false || methodInfo is null)
                 {
                     Console.WriteLine("methodInfo is null, insult");
@@ -169,7 +171,8 @@ namespace Protocol
 
         private async Task<bool> ProcessControllerMethodAsync()
         {
-            var list = new List<byte>();
+            List<byte> list = new List<byte>();
+            bool res = false;
             switch (executedMethod.MethodInfo.CommandHeader)
             {
                 case CommandHeader.FingerTimeoutCurrent:
@@ -188,7 +191,7 @@ namespace Protocol
                         executedMethod.RepeatCount++;
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
-                    return true;
+                    res=true;
                     break;
                 case CommandHeader.FingerWriteInBase:
                     list = new List<byte>();
@@ -210,7 +213,7 @@ namespace Protocol
                         executedMethod.RepeatCount++;
                         await Task.Delay(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
                     }
-                    return true;
+                    res = true;
                     break;
                 case CommandHeader.TerminalConf:
                     list = new List<byte>();
@@ -231,7 +234,7 @@ namespace Protocol
                         executedMethod.RepeatCount++;
                         await Task.Delay(TimeSpan.FromSeconds(60)).ConfigureAwait(false);
                     }
-                    return true;
+                    res = true;
                     break;
                 case CommandHeader.TerminalSysInfo:
                     list = new List<byte>();
@@ -252,7 +255,7 @@ namespace Protocol
                         executedMethod.RepeatCount++;
                         await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
                     }
-                    return true;
+                    res = true;
                     break;
                 case CommandHeader.FingerDeleteId:
                     list = new List<byte>();
@@ -273,7 +276,7 @@ namespace Protocol
                         executedMethod.RepeatCount++;
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
-                    return true;
+                    res = true;
                     break;
                 case CommandHeader.FingerDeleteAll:
                     list = new List<byte>();
@@ -294,7 +297,7 @@ namespace Protocol
                         executedMethod.RepeatCount++;
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
-                    return true;
+                    res = true;
                     break;
                 case CommandHeader.FingerSetTimeout:
                     list = new List<byte>();
@@ -315,10 +318,10 @@ namespace Protocol
                         executedMethod.RepeatCount++;
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
-                    return true;
+                    res = true;
                     break;
             }
-            return false;
+            return res;
         }
         #region protocol host events
         public delegate void GetConfigEventHandler(object sender, GetConfigEventArgs e);
@@ -353,13 +356,21 @@ namespace Protocol
 
         protected void OnExecuteMethodRepeatReachedLimit(object sender, RepeatCountReachedLimitArgs args)
         {
-            logger.LogWarning($"RepeatCount ReachedLimit: {args.Count}");
+            if(args is null)
+            {
+                throw new ArgumentNullException(nameof(args));
+            }
+            Logger.LogWarning($"RepeatCount ReachedLimit: {args.Count}");
             executedMethod.IsCompleted = true;
             executedMethod.IsError = true;
         }
 
         protected async void OnExecuteMethodChange(object sender, PropertyChangedEventArgs args)
         {
+            if(args is null)
+            {
+                throw new ArgumentNullException(nameof(args));
+            }
             Console.WriteLine($"Info: Executed method property changed: {args.PropertyName}");
             if (executedMethod.IsFired==false)
             {
@@ -369,13 +380,13 @@ namespace Protocol
                     if(executedMethod.CommandValue!=null && executedMethod.CommandValue.Length > 0)
                     {
                         executedMethod.IsFired = true;
-                        _=(direction == Direction.Controller) ? await ProcessTerminalMethodAsync().ConfigureAwait(false) : await ProcessControllerMethodAsync().ConfigureAwait(false);
+                        _=(direction == Direction.Controller) ? ProcessTerminalMethod() : await ProcessControllerMethodAsync().ConfigureAwait(false);
                     };
                 }
                 else
                 {
                     executedMethod.IsFired = true;
-                    _ = (direction == Direction.Controller) ? await ProcessTerminalMethodAsync().ConfigureAwait(false) : await ProcessControllerMethodAsync().ConfigureAwait(false);
+                    _ = (direction == Direction.Controller) ? ProcessTerminalMethod() : await ProcessControllerMethodAsync().ConfigureAwait(false);
                 }
              
             }
@@ -383,8 +394,12 @@ namespace Protocol
 
         public async void DataReceived(object sender, MessageQueueEnqueueEventArgs<byte[]> e)
         {
-            byte[] input;
-            bool dequeue = transport.InputQueue.TryDequeue(out input);
+            bool dequeue = transport.InputQueue.TryDequeue(out byte[] input);
+            if (!dequeue)
+            {
+                Console.WriteLine($"DataReceived action canceled:failed to dequeue");
+                return;
+            }
             if (input!=null && input.Length>0)
             {
                 var message = RequestMiddleware.Process(input);
@@ -404,14 +419,14 @@ namespace Protocol
                         }
                         else
                         {
-                            logger.LogWarning("Protocol flow error: executedMethod is null");
+                            Logger.LogWarning("Protocol flow error: executedMethod is null");
                         }
                     }
                     if (executedMethod != null)
                     {
                         if (message.Method.CommandHeader != executedMethod.MethodInfo.CommandHeader && message.Type != MessageType.REQ)
                         {
-                            logger.LogWarning("Protocol flow warning: CommandHeader");
+                            Logger.LogWarning("Protocol flow warning: CommandHeader");
                             return;
                         }
                         switch (message.Type)
@@ -452,48 +467,50 @@ namespace Protocol
                                 }
                                 break;                            
                             default:
-                                logger.LogWarning("Protocol flow error: MessageType");
+                                Logger.LogWarning("Protocol flow error: MessageType");
                                 break;
                         }
                     }
                 }
                 else
                 {
-                    logger.LogWarning($"Process error valid:{message.IsValid}");
+                    Logger.LogWarning($"Process error valid:{message.IsValid}");
                 }
 
             }
             else
             {
-                logger.LogWarning("EnqueueAction error");
+                Logger.LogWarning("EnqueueAction error");
             }
         }
 
         #endregion
 
-        private async Task<bool> ProcessTerminalMethodAsync()
+        private bool ProcessTerminalMethod()
         {
+            bool res = false;
             switch (executedMethod.MethodInfo.CommandHeader)
             {
                 case CommandHeader.Card:
                     PushCardCommandEvent(executedMethod.CommandValue);
-                    return true;
+                    res = true;
                     break;
                 case CommandHeader.Finger:
                     PushFingerCommandEvent(executedMethod.CommandValue);
-                    return true;
+                    res = true;
                     break;
                 case CommandHeader.Ble:
                     PushBleCommandEvent(executedMethod.CommandValue);
-                    return true;
+                    res = true;
                     break;
                 case CommandHeader.Error:
                     Console.WriteLine("Error processed");
                     executedMethod.IsCompleted = true;
+                    res = true;
                     break;
                     //case ProtocolCommands.
             }
-            return false;
+            return res;
         }
     }
 

@@ -19,8 +19,10 @@ namespace Worker.Host.SignalR
             Dictionary = new ConcurrentDictionary<string, MessageQueue<SignalRMessage>>();
             foreach (var port in ports)
             {
-                var tempQueue = new MessageQueue<SignalRMessage>();
-                tempQueue.Port = port.PortName;
+                var tempQueue = new MessageQueue<SignalRMessage>
+                {
+                    Port = port.PortName
+                };
                 Dictionary.TryAdd(port.PortName, tempQueue); 
             }
         }
@@ -35,8 +37,10 @@ namespace Worker.Host.SignalR
             Dictionary = new ConcurrentDictionary<string, MessageQueue<SignalRresponse>>();
             foreach (var port in ports)
             {
-                var tempQueue = new MessageQueue<SignalRresponse>();
-                tempQueue.Port = port.PortName;
+                var tempQueue = new MessageQueue<SignalRresponse>
+                {
+                    Port = port.PortName
+                };
                 Dictionary.TryAdd(port.PortName, tempQueue);
             }
         }

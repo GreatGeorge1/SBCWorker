@@ -13,8 +13,8 @@ namespace Protocol
             InputQueue = new MessageQueue<byte[]>();
         }
 
-        public MessageQueue<byte[]> InputQueue { get; set; }
-        public MessageQueue<byte[]> OutputQueue { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public MessageQueue<byte[]> InputQueue { get; private set; }
+        public MessageQueue<byte[]> OutputQueue { get; private set; }
 
         public string GetInfo()
         {
@@ -27,7 +27,7 @@ namespace Protocol
             return true;
         }
 
-        public Task ReadMessageAsync()
+        public void ReadMessage()
         {
             throw new NotImplementedException();
         }
