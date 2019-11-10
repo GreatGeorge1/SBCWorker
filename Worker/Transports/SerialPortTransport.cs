@@ -20,14 +20,14 @@ namespace Worker.Host.Transports
         private SerialPort stream;
 
         private ILogger Logger { get; set; }
-        public MessageQueue<byte[]> InputQueue { get; set; }
-        public MessageQueue<byte[]> OutputQueue { get; set; }
+        public ConcurrentMessageBag<byte[]> InputQueue { get; set; }
+        public ConcurrentMessageBag<byte[]> OutputQueue { get; set; }
 
         private bool serial_read = false;
         public SerialPortTransport(SerialConfig port, ILogger logger = null)
         {
-            InputQueue = new MessageQueue<byte[]>();
-            OutputQueue=new MessageQueue<byte[]>();
+            InputQueue = new ConcurrentMessageBag<byte[]>();
+            OutputQueue=new ConcurrentMessageBag<byte[]>();
             OutputQueue.EnqueueEvent += EnqueueOutputMessageAction;
             this.port = port ?? throw new ArgumentNullException(nameof(port));
             if (logger != null)
@@ -99,7 +99,7 @@ namespace Worker.Host.Transports
 
         private async void EnqueueOutputMessageAction(object sender, MessageQueueEnqueueEventArgs<byte[]> args)
         {
-            var msg=OutputQueue.Dequeue();
+            OutputQueue.TryDequeue(out byte[] msg);
             await WriteMessageAsync(msg).ConfigureAwait(false);
         }
         private void PinChangedAction(object sender, SerialPinChangedEventArgs e)
@@ -158,8 +158,9 @@ namespace Worker.Host.Transports
                             continue;
                         }
                         list.Add(_byte);
-                    } while (stream.BytesToRead > 0 && list.Count < 5);
-                    var len = list.LastOrDefault();
+                    } while (list.Count <= 6);
+                    byte[] t= list.ToArray();
+                    int len = t[4]+t[5];
                     if (len == 0)
                     {
                         Logger.LogWarning("corrupted message");

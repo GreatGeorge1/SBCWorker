@@ -107,8 +107,8 @@ namespace Protocol
                 (byte)MessageType.RES,
                 (byte)this.MethodInfo.CommandHeader,
                 RequestMiddleware.CalCheckSum(result, result.Length),
-                (byte)result.Length
             };
+            list.AddRange(RequestMiddleware.IntToHighLow(result.Length));
             foreach (var item in result)
             {
                 list.Add(item);

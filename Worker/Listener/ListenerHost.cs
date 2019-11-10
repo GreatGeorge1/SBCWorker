@@ -45,9 +45,9 @@ namespace Worker.Host
                 try
                 {
                     Console.WriteLine($"PORT: {port.PortName}");
-                    var res1 = inputQueue.Dictionary.TryGetValue(port.PortName, out MessageQueue<SignalRMessage> tempQueue);
+                    var res1 = inputQueue.Dictionary.TryGetValue(port.PortName, out ConcurrentMessageBag<SignalRMessage> tempQueue);
 
-                    var res2 = outputQueue.Dictionary.TryGetValue(port.PortName, out MessageQueue<SignalRresponse> tempOutQueue);
+                    var res2 = outputQueue.Dictionary.TryGetValue(port.PortName, out ConcurrentMessageBag<SignalRresponse> tempOutQueue);
 
                     if (!res1 || !res2)
                     {

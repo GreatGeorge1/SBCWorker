@@ -28,7 +28,7 @@ namespace DevConsole
             }
             ConsoleTableBuilder.From(list).WithFormat(ConsoleTableBuilderFormat.Minimal).ExportAndWriteLine();
 
-            Protocol.MessageQueue<string> cqueue = new Protocol.MessageQueue<string>();
+            Protocol.ConcurrentMessageBag<string> cqueue = new Protocol.ConcurrentMessageBag<string>();
             cqueue.EnqueueEvent += EnqueueAction;
             cqueue.Enqueue("item");
             cqueue.Enqueue("item2");
@@ -138,8 +138,6 @@ namespace DevConsole
                 HasResponseValue=input.HasResponseValue,
                 DirectionTo=input.DirectionTo,
             };
-          
-
             return res;
         }
     }

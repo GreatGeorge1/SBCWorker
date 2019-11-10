@@ -10,11 +10,11 @@ namespace Protocol
     {
         public TestTransport()
         {
-            InputQueue = new MessageQueue<byte[]>();
+            InputQueue = new ConcurrentMessageBag<byte[]>();
         }
 
-        public MessageQueue<byte[]> InputQueue { get; private set; }
-        public MessageQueue<byte[]> OutputQueue { get; private set; }
+        public ConcurrentMessageBag<byte[]> InputQueue { get; private set; }
+        public ConcurrentMessageBag<byte[]> OutputQueue { get; private set; }
 
         public string GetInfo()
         {

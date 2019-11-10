@@ -12,14 +12,14 @@ namespace Worker.Host.SignalR
 
     public class InputMessageQueue : IMessageQueue
     {
-        public readonly ConcurrentDictionary<string, MessageQueue<SignalRMessage>> Dictionary;
+        public readonly ConcurrentDictionary<string, ConcurrentMessageBag<SignalRMessage>> Dictionary;
 
         public InputMessageQueue(IEnumerable<SerialConfig> ports)
         {
-            Dictionary = new ConcurrentDictionary<string, MessageQueue<SignalRMessage>>();
+            Dictionary = new ConcurrentDictionary<string, ConcurrentMessageBag<SignalRMessage>>();
             foreach (var port in ports)
             {
-                var tempQueue = new MessageQueue<SignalRMessage>
+                var tempQueue = new ConcurrentMessageBag<SignalRMessage>
                 {
                     Port = port.PortName
                 };
@@ -30,14 +30,14 @@ namespace Worker.Host.SignalR
 
     public class OutputMessageQueue : IMessageQueue
     {
-        public readonly ConcurrentDictionary<string, MessageQueue<SignalRresponse>> Dictionary;
+        public readonly ConcurrentDictionary<string, ConcurrentMessageBag<SignalRresponse>> Dictionary;
 
         public OutputMessageQueue(IEnumerable<SerialConfig> ports)
         {
-            Dictionary = new ConcurrentDictionary<string, MessageQueue<SignalRresponse>>();
+            Dictionary = new ConcurrentDictionary<string, ConcurrentMessageBag<SignalRresponse>>();
             foreach (var port in ports)
             {
-                var tempQueue = new MessageQueue<SignalRresponse>
+                var tempQueue = new ConcurrentMessageBag<SignalRresponse>
                 {
                     Port = port.PortName
                 };

@@ -1,10 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Protocol
 {
-    public class MessageQueue<T>:Queue<T>, ICollection<T>
+    public class ConcurrentMessageBag<T>: ConcurrentQueue<T>
     {
         public string Port { get; set; }//TODO govno
 
@@ -21,16 +22,6 @@ namespace Protocol
         {
             //EnqueueEvent?.Invoke(this, new MessageQueueEnqueueEventArgs<T>(item));
             EnqueueEvent?.Invoke(this, new MessageQueueEnqueueEventArgs<T>(item, Port));
-        }
-
-        public void Add(T item)
-        {
-            base.Enqueue(item);
-        }
-
-        public bool Remove(T item)
-        {
-            throw new NotImplementedException();
         }
 
         public delegate void CustomQueueEnqueueEventHandler(object sender, MessageQueueEnqueueEventArgs<T> e);

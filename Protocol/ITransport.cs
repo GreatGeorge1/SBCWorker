@@ -19,8 +19,8 @@ namespace Protocol
         /// </summary>
         void ReadMessage();
         bool Init();
-        MessageQueue<TType> InputQueue { get; }
-        MessageQueue<TType> OutputQueue { get; }
+        ConcurrentMessageBag<TType> InputQueue { get; }
+        ConcurrentMessageBag<TType> OutputQueue { get; }
         string GetInfo();
     }
 

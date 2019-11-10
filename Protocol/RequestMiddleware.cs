@@ -26,7 +26,10 @@ namespace Protocol
                         executedMethod.MethodInfo = methodInfo;
                         if (IsValidCheckSum(message, out _))
                         {
-                            var value = message.Skip(5).Take(message[4]).ToArray();
+                            var value = message
+                                .Skip(6)
+                                .Take(message[4]+message[5])
+                                .ToArray();
                             //  var strValue = Encoding.ASCII.GetString(value);
                             executedMethod.CommandValue = value;
                             // resMsg = new Message(methodInfo, value, mtype);
@@ -91,8 +94,8 @@ namespace Protocol
             }
             try
             {
-                var temp = message[4];
-                var bytes = message.Skip(5).Take(temp).ToArray();
+                var temp = message[4]+message[5];
+                var bytes = message.Skip(6).Take(temp).ToArray();
                 var checksum = message[3];
                 newChecksum = CalCheckSum(bytes, bytes.Length);
                 if (checksum == newChecksum)
@@ -119,6 +122,29 @@ namespace Protocol
                 _CheckSumByte ^= PacketData[i];
 
             return _CheckSumByte;
+        }
+        /// <summary>
+        /// max input 500
+        /// byte[] length 2
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public static byte[] IntToHighLow(int input)
+        {
+            int max = 500;
+            if (input <= 255)
+            {
+                return new byte[] { 0x0, (byte)input };
+            }
+            if (input >= 500)
+            {
+                return new byte[] { 0xff, 0xff };
+            }
+            else
+            {
+                int temp = input-255;
+                return new byte[] { (byte)temp, (byte)(input - temp) };
+            }
         }
     }
 

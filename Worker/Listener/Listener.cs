@@ -16,6 +16,7 @@ using Worker.Models;
 using Protocol;
 using Worker.Host.Transports;
 using Protocol.Events;
+using System.Collections.Concurrent;
 
 namespace Worker.Host
 {
@@ -42,7 +43,7 @@ namespace Worker.Host
                 {
                     break;
                 }
-                res=await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)id, (byte)privilage });
+                res=await host.ExecuteControllerMethodAsync(CommandHeader.FingerWriteInBase, new byte[] { (byte)id, (byte)privilage }).ConfigureAwait(false);
                 i++;
             }
             if (i >= 3)
@@ -64,14 +65,14 @@ namespace Worker.Host
         // private readonly SerialConfig port;
         private readonly Protocol.Host host;
         private readonly string PortName;
-        private readonly MessageQueue<SignalRMessage> inputQueue;
-        private readonly MessageQueue<SignalRresponse> outputQueue;
+        private readonly ConcurrentMessageBag<SignalRMessage> inputQueue;
+        private readonly ConcurrentMessageBag<SignalRresponse> outputQueue;
 
         private AddFingerSaga FSaga = null;
-        private readonly Queue<AddFingerSaga> SagaQueue = new Queue<AddFingerSaga>();
+        private readonly ConcurrentQueue<AddFingerSaga> SagaQueue = new ConcurrentQueue<AddFingerSaga>();
 
         public Listener(ILogger logger, SerialConfig port,
-           ControllerDbContext dbcontext, MessageQueue<SignalRMessage> inputQueue, MessageQueue<SignalRresponse> outputQueue)
+           ControllerDbContext dbcontext, ConcurrentMessageBag<SignalRMessage> inputQueue, ConcurrentMessageBag<SignalRresponse> outputQueue)
         {
             PortName = port.PortName;
             this.logger = logger;
@@ -100,7 +101,8 @@ namespace Worker.Host
             Console.WriteLine("ProcessSaga");
             if (FSaga is null)
             {
-                FSaga=SagaQueue.Dequeue();
+                _=SagaQueue.TryDequeue(out AddFingerSaga Saga);
+                FSaga = Saga;
                 FSaga.IsFired = true;
                 Console.WriteLine("Info: Saga is fired"); 
             }
@@ -110,7 +112,8 @@ namespace Worker.Host
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                 }
-                FSaga = SagaQueue.Dequeue();
+                _ = SagaQueue.TryDequeue(out AddFingerSaga Saga);
+                FSaga = Saga;
                 FSaga.IsFired = true;
                 Console.WriteLine("Info: Saga is fired");
             }
@@ -123,9 +126,8 @@ namespace Worker.Host
             //{
             //    return;
             //}
-            //Console.WriteLine("OnSignalRMessage HIT");
-            dynamic t = args;
-            _ = inputQueue.Dequeue();//govno
+            var t = args;
+            _ = inputQueue.TryDequeue(out SignalRMessage item);//govno
             switch (t.Item.Method){
                 case SignalRMethod.GetConfig:
                     Console.WriteLine("OnSignalRMessage GetConfig HIT2");
@@ -184,7 +186,7 @@ namespace Worker.Host
 
         private async void OnCardCommandEvent(object sender, CardCommandEventArgs args)
         {
-            var res = await VerifyCard(args.Card);
+            var res = await VerifyCard(args.Card).ConfigureAwait(false);
             if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Card)
             {
                 return;
@@ -201,7 +203,7 @@ namespace Worker.Host
 
         private async void OnFingerCommandEvent(object sender, FingerCommandEventArgs args)
         {
-            var res = await VerifyFinger(args.Finger);
+            var res = await VerifyFinger(args.Finger).ConfigureAwait(false);
             if (host.ExecutedMethod.MethodInfo.CommandHeader != CommandHeader.Finger)
             {
                 return;
@@ -231,7 +233,7 @@ namespace Worker.Host
                 //if (FSaga.UserBLE == bleStr)
                 if (true)
                 {
-                    await Task.WhenAny(FSaga.CompleteBle(host, FSaga.FingerId, FSaga.UserPrivilage));
+                    await Task.WhenAny(FSaga.CompleteBle(host, FSaga.FingerId, FSaga.UserPrivilage)).ConfigureAwait(false);
                     //Saga = saga;
                 }
             }
@@ -248,7 +250,7 @@ namespace Worker.Host
             {
                 Console.WriteLine($"Listener task doing background work.");
 
-                await host.StartAsync(stoppingToken);
+                await host.StartAsync(stoppingToken).ConfigureAwait(false);
             }
 
            // Console.WriteLine($"Listener background task is stopping.");

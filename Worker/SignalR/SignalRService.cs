@@ -184,8 +184,10 @@ namespace Worker.Host.SignalR
 
         public async void OnSignalRresponse(object sender, MessageQueueEnqueueEventArgs<SignalRresponse> args)
         {
-            var flag = outputQueue.Dictionary.TryGetValue((string)args.Port, out MessageQueue<SignalRresponse> queue);
-            var item = queue.Dequeue();//govno
+            var flag = outputQueue.Dictionary.TryGetValue((string)args.Port, out ConcurrentMessageBag<SignalRresponse> queue);
+
+            var item = args.Item;
+            _= queue.TryDequeue(out SignalRresponse t);//govno
             if (flag == true && !(queue is null))
             {
                 switch ((SignalRMethod)item.Method)
@@ -203,7 +205,7 @@ namespace Worker.Host.SignalR
 
         protected void RegisterSignalRListeners()
         {
-            connection.On<GetConfigReq>("GetConfig", req =>
+            connection.On("GetConfig", (Action<GetConfigReq>)(req =>
             {
                 if (req.Port is null)
                 {
@@ -211,15 +213,15 @@ namespace Worker.Host.SignalR
                     return;
                 }
                 Console.WriteLine($"req.Port is '{req.Port}'");
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out ConcurrentMessageBag<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.GetConfig, Address = req.Address });
+                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.GetConfig, Address = req.Address });
                 }
-            });
+            }));
 
-            connection.On<GetFingerTimeoutReq>("GetFingerTimeoutCurrent", req =>
+            connection.On("GetFingerTimeoutCurrent", (Action<GetFingerTimeoutReq>)(req =>
             {
                 Console.WriteLine("SignalR GetFingerTimeoutCurrent HIT!");
 
@@ -229,16 +231,16 @@ namespace Worker.Host.SignalR
                     return;
                 }
                 Console.WriteLine($"req.Port is '{req.Port}'");
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out ConcurrentMessageBag<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.GetFingerTimeoutCurrent });
+                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.GetFingerTimeoutCurrent });
                 }
 
-            });
+            }));
 
-            connection.On<AddFingerReq>("AddFinger", req =>
+            connection.On("AddFinger", (Action<AddFingerReq>)(req =>
             {
                 Console.WriteLine("SignalR AddFinger HIT!");
 
@@ -260,16 +262,16 @@ namespace Worker.Host.SignalR
                 Console.WriteLine($"req.Port is '{(string)req.Port}'");
                 Console.WriteLine($"uid: '{req.Uid}', privilage: '{req.Privilage}' port: '{req.Port}'");
 
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out ConcurrentMessageBag<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.AddFinger, Uid = req.Uid, Privilage = req.Privilage });
+                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.AddFinger, Uid = req.Uid, Privilage = req.Privilage });
                 }
 
-            });
+            }));
 
-            connection.On<SendConfigReq>("SendConfig", req =>
+            connection.On("SendConfig", (Action<SendConfigReq>)(req =>
             {
                 Console.WriteLine("SignalR SendConfig HIT!");
 
@@ -284,16 +286,16 @@ namespace Worker.Host.SignalR
                     return;
                 }
 
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out ConcurrentMessageBag<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.SendConfig, JsonString = req.JsonString });
+                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.SendConfig, JsonString = req.JsonString });
                 }
 
-            });
+            }));
 
-            connection.On<DeleteFingerByIdReq>("DeleteFingerById", req =>
+            connection.On("DeleteFingerById", (Action<DeleteFingerByIdReq>)(req =>
             {
                 Console.WriteLine("SignalR DeleteFingerById HIT!");
                 if (req.Port is null)
@@ -307,16 +309,16 @@ namespace Worker.Host.SignalR
                     return;
                 }
 
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out ConcurrentMessageBag<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.DeleteFingerById, Uid = req.Id });
+                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.DeleteFingerById, Uid = req.Id });
                 }
 
-            });
+            }));
 
-            connection.On<AddFingerByBleReq>("AddFingerByBle", req =>
+            connection.On("AddFingerByBle", (Action<AddFingerByBleReq>)(req =>
             {
                 Console.WriteLine("SignalR AddFingerByBle HIT!");
                 if (req.Port is null)
@@ -345,11 +347,11 @@ namespace Worker.Host.SignalR
                     return;
                 }
 
-                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
+                var flag = inputQueue.Dictionary.TryGetValue(req.Port, out ConcurrentMessageBag<SignalRMessage> queue);
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue(new SignalRMessage
+                    queue.Enqueue((SignalRMessage)new SignalRMessage
                     {
                         Port = req.Port,
                         Method = SignalRMethod.AddFingerByBle,
@@ -359,9 +361,9 @@ namespace Worker.Host.SignalR
                         Privilage = req.Privilage
                     });
                 }
-            });
+            }));
 
-            connection.On<SetFingerTimeoutReq>("SetFingerTimeout", req =>
+            connection.On("SetFingerTimeout", (Action<SetFingerTimeoutReq>)(req =>
             {
                 Console.WriteLine("SignalR SetFingerTimeout HIT!");
                 if (req.Port is null)
@@ -376,20 +378,20 @@ namespace Worker.Host.SignalR
                 //    return;
                 //}
 
-                inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
+                inputQueue.Dictionary.TryGetValue(req.Port, out ConcurrentMessageBag<SignalRMessage> queue);
 
                 if (!(queue is null))
                 {
-                    queue.Enqueue(new SignalRMessage
+                    queue.Enqueue((SignalRMessage)new SignalRMessage
                     {
                         Method = SignalRMethod.SetFingerTimeout,
                         Port = req.Port,
                         Timeout = req.Timeout
                     });
                 }
-            });
+            }));
 
-            connection.On<DeleteAllFingerprintsReq>("DeleteAllFingerprints", req =>
+            connection.On("DeleteAllFingerprints", (Action<DeleteAllFingerprintsReq>)(req =>
             {
                 Console.WriteLine("SignalR DeleteAllFingerprints HIT!");
                 if (req.Port is null)
@@ -398,17 +400,17 @@ namespace Worker.Host.SignalR
                     return;
                 }
 
-                inputQueue.Dictionary.TryGetValue(req.Port, out MessageQueue<SignalRMessage> queue);
+                inputQueue.Dictionary.TryGetValue(req.Port, out ConcurrentMessageBag<SignalRMessage> queue);
 
                 if (!(queue is null))
                 {
-                    queue.Enqueue(new SignalRMessage
+                    queue.Enqueue((SignalRMessage)new SignalRMessage
                     {
                         Method = SignalRMethod.DeleteAllFingerprints,
                         Port = req.Port
                     });
                 }
-            });
+            }));
         }
     }
 }
