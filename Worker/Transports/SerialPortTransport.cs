@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Protocol;
 using System;
@@ -9,7 +8,6 @@ using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Worker.Host.Transports
@@ -20,14 +18,14 @@ namespace Worker.Host.Transports
         private SerialPort stream;
 
         private ILogger Logger { get; set; }
-        private readonly object _lock=new object();
+        private readonly object _lock = new object();
         public ConcurrentMessageBag<byte[]> InputQueue { get; set; }
         public ConcurrentMessageBag<byte[]> OutputQueue { get; set; }
 
         public SerialPortTransport(SerialConfig port, ILogger logger = null)
         {
             InputQueue = new ConcurrentMessageBag<byte[]>();
-            OutputQueue=new ConcurrentMessageBag<byte[]>();
+            OutputQueue = new ConcurrentMessageBag<byte[]>();
             OutputQueue.EnqueueEvent += EnqueueOutputMessageAction;
             this.port = port ?? throw new ArgumentNullException(nameof(port));
             if (logger != null)
@@ -62,7 +60,6 @@ namespace Worker.Host.Transports
             stream.DataReceived += DataReceivedAction;
             stream.ErrorReceived += ErrorReceivedAction;
             stream.PinChanged += PinChangedAction;
-           
 
             if (port.IsRS485)
             {
@@ -102,6 +99,7 @@ namespace Worker.Host.Transports
             OutputQueue.TryDequeue(out byte[] msg);
             WriteMessage(msg);
         }
+
         private void PinChangedAction(object sender, SerialPinChangedEventArgs e)
         {
             Logger.LogInformation($"Port {port.PortName} pin changed: {e.ToString()}");
@@ -117,87 +115,123 @@ namespace Worker.Host.Transports
             Logger.LogInformation("DataReceived Action raised");
             ReadMessage();
         }
+
+        private bool ReadBody(Stopwatch sw, int length, out ICollection<byte> list)
+        {
+            bool ok = true;
+            int len = length;
+            int k = len;
+
+            list = new List<byte>();
+            sw.Reset();
+            do
+            {
+                if (sw.ElapsedMilliseconds >= 2000)
+                {
+                    Logger.LogWarning("ReadTimeout");
+                    ok = false;
+                    break;
+                }
+                byte _byte = 0;
+                try
+                {
+                    _byte = (byte)stream.ReadByte();
+                }
+                catch
+                {
+                    continue;
+                }
+                list.Add(_byte);
+                k--;
+            } while (stream.BytesToRead > 0 && k > 0);
+            if (length == list.Count)
+            {
+                return true;
+            }
+            return ok;
+        }
+
+        private bool ReadHeader(Stopwatch sw, out ICollection<byte> list)
+        {
+            bool ok = true;
+            list = new List<byte>();
+            do
+            {
+                if (sw.ElapsedMilliseconds >= 2000)
+                {
+                    Logger.LogWarning("ReadTimeout");
+                    ok = false;
+                    break;
+                }
+                byte _byte = 0;
+                if (stream.BytesToRead > 0)
+                {
+                    _byte = (byte)stream.ReadByte();
+                }
+                else
+                {
+                    continue;
+                }
+                list.Add(_byte);
+            } while (list.Count <= 6);
+            if (list.Count == 6)
+            {
+                return true;
+            }
+            return ok;
+        }
+
         /// <summary>
         /// Читает сообщение и добавляет построчно в InputQueue
         /// </summary>
         /// <returns></returns>
         public void ReadMessage()
         {
+            bool ok = true;
             Stopwatch sw = new Stopwatch();
-            try
+            lock (_lock)
             {
-                do
+                try
                 {
                     sw.Start();
-                    var list = new List<byte>();
                     var bytes = new List<byte>();
-                    lock (_lock)
+                    ok = ReadHeader(sw, out ICollection<byte> list);
+                    if (ok)
                     {
-                        do
-                        {
-                            if (sw.ElapsedMilliseconds >= 2000)
-                            {
-                                Logger.LogWarning("ReadTimeout");
-                                return;
-                            }
-                            byte _byte = 0;
-                            if (stream.BytesToRead > 0)
-                            {
-                                _byte = (byte)stream.ReadByte();       
-                            }
-                            else
-                            {
-                                continue;
-                            }
-                            list.Add(_byte);
-                        } while (list.Count <= 6);
-                        byte[] t = list.ToArray();
-                        int len = t[4] + t[5];
-                        if (len == 0)
-                        {
-                            Logger.LogWarning("corrupted message");
-                            return;
-                        }
-                        int k = len;
                         bytes.AddRange(list);
-                        sw.Reset();
-                        do
+                        ok = ReadBody(sw, RequestMiddleware.HighLowToInt(
+                            list.ElementAt(4),
+                            list.ElementAt(5)
+                            ), out ICollection<byte> body);
+                        if (ok)
                         {
-                            if (sw.ElapsedMilliseconds >= 2000)
-                            {
-                                Logger.LogWarning("ReadTimeout");
-                                return;
-                            }
-                            byte _byte = 0;
-                            try
-                            {
-                                _byte = (byte)stream.ReadByte();
-                            }
-                            catch
-                            {
-                                continue;
-                            }
-                            bytes.Add(_byte);
-                            k--;
-                        } while (stream.BytesToRead > 0 && k > 0);
+                            bytes.AddRange(body);
+                        }
                     }
-                    var res = bytes.ToArray();
-                    string str = BitConverter.ToString(res);
-                    Console.WriteLine(str);
-                    InputQueue.Enqueue(res);
-                } while (stream.RtsEnable == true);
-            }
-            catch (IOException ex)
-            {
-                Logger.LogWarning(ex.ToString());
-            }
-            catch (System.TimeoutException ex)
-            {
-                Logger.LogWarning("r:timeout");
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger.LogWarning(ex.ToString());
+                    if (ok)
+                    {
+                        var res = bytes.ToArray();
+                        string str = BitConverter.ToString(res);
+                        Console.WriteLine(str);
+                        InputQueue.Enqueue(res);
+                    }
+                    else
+                    {
+                        Logger.LogWarning($"r:error, bytes:'{BitConverter.ToString(bytes.ToArray())}'");
+                    }
+                }
+                catch (IOException ex)
+                {
+                    Logger.LogWarning(ex.ToString());
+                }
+                catch (System.TimeoutException ex)
+                {
+                    Logger.LogWarning("r:timeout");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Logger.LogWarning(ex.ToString());
+                }
             }
             return;
         }
@@ -206,9 +240,9 @@ namespace Worker.Host.Transports
         {
             if (stream.IsOpen)
             {
-                try
+                lock (_lock)
                 {
-                    lock (_lock)
+                    try
                     {
                         if (port.IsRS485)
                         {
@@ -218,28 +252,33 @@ namespace Worker.Host.Transports
                         stream.Write(message, 0, message.Length);
                         if (port.IsRS485)
                         {
-                            Task.Delay(TimeSpan.FromMilliseconds(50)).Wait();
                             stream.RtsEnable = true;
                             Task.Delay(TimeSpan.FromMilliseconds(50)).Wait();
                         }
+                        var bytes = stream.BytesToWrite;
+                        var size = stream.WriteBufferSize;
+                        Logger.LogInformation($"wrote to port {port.PortName}: {message}, bytes {bytes}, buff_size {size}");
                     }
-                    var bytes = stream.BytesToWrite;
-                    var size = stream.WriteBufferSize;
-                    Logger.LogInformation($"wrote to port {port.PortName}: {message}, bytes {bytes}, buff_size {size}");
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"ex {port.PortName}");
-                    Logger.LogWarning(ex.ToString());
-                    lock (_lock)
+                    catch (Exception ex)
                     {
+                        Logger.LogWarning($"ex {port.PortName}");
+                        Logger.LogWarning(ex.ToString());
                         if (port.IsRS485)
                         {
                             stream.RtsEnable = true;
+                            Task.Delay(TimeSpan.FromMilliseconds(50)).Wait();
+                        }
+                        //throw new Exception(ex.Message);
+                        return false;
+                    }
+                    finally
+                    {
+                        if (port.IsRS485)
+                        {
+                            if(stream.RtsEnable != true)
+                                stream.RtsEnable = true;
                         }
                     }
-                    //throw new Exception(ex.Message);
-                    return false;
                 }
             }
             else
@@ -254,6 +293,5 @@ namespace Worker.Host.Transports
         {
             return $"port:'{port.PortName}' isRs485:'{port.IsRS485.ToString()}'";
         }
-
     }
 }

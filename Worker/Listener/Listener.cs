@@ -178,7 +178,7 @@ namespace Worker.Host
             }
         }
 
-        public void OnGetConfigEvent(object sender, GetConfigEventArgs args)
+        public async void OnGetConfigEvent(object sender, GetConfigEventArgs args)
         {
             Console.WriteLine($"OnGetConfigEvent Hit json:'{Encoding.ASCII.GetString(args.Json)}' address:'{args.Address}'");
             outputQueue.Enqueue(new SignalRresponse{ JsonString= Encoding.ASCII.GetString(args.Json), Method=SignalRMethod.GetConfig, Address=args.Address, Port=PortName});

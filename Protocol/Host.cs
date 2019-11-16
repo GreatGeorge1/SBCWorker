@@ -307,9 +307,10 @@ namespace Protocol
         public event GetConfigEventHandler GetConfigEvent;
         protected void PushGetConfigEvent(byte[] json, string address)
         {
+            Console.WriteLine("PushGetConfigEvent");
             GetConfigEvent?.Invoke(this, new GetConfigEventArgs(json, address));
         }
- 
+
 
         public delegate void CardCommandEventHandler(object sender, CardCommandEventArgs e);
         public event CardCommandEventHandler CardCommandEvent;
@@ -450,7 +451,7 @@ namespace Protocol
                                     lock (_lock)
                                     {
                                         executedMethod.IsCompleted = true;
-                                    };
+                                    }
                                 }
                                 break;
                             case MessageType.REQ:

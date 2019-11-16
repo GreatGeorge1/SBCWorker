@@ -15,7 +15,6 @@ namespace Protocol
             {
                 throw new ArgumentNullException(nameof(message));
             }
-            var executedMethod = new ExecutedMethod();
             if (IsValid(message))
             {
                 if (IsValidType(message, out MessageType mtype))
@@ -23,15 +22,15 @@ namespace Protocol
                     if (IsValidCommand(message, out CommandHeader command))
                     {
                         Protocol.Data.GetMethods().TryGetValue(command, out Method methodInfo);
-                        executedMethod.MethodInfo = methodInfo;
                         if (IsValidCheckSum(message, out _))
                         {
                             var value = message
                                 .Skip(6)
-                                .Take(message[4]+message[5])
+                                .Take(
+                                    HighLowToInt(message.ElementAt(4),message.ElementAt(5))
+                                )
                                 .ToArray();
                             //  var strValue = Encoding.ASCII.GetString(value);
-                            executedMethod.CommandValue = value;
                             // resMsg = new Message(methodInfo, value, mtype);
                             return new Message(methodInfo, value, mtype);
                         }
@@ -39,6 +38,7 @@ namespace Protocol
                 }
             }
             Message resMsg = new Message(new Method(),Array.Empty<byte>(), MessageType.NotSet, false);
+            Console.WriteLine($"rm:not valid message, bytes:'{BitConverter.ToString(message)}'");
             return resMsg;
         }
         
@@ -94,7 +94,7 @@ namespace Protocol
             }
             try
             {
-                var temp = message[4]+message[5];
+                var temp = HighLowToInt(message[4], message[5]);
                 var bytes = message.Skip(6).Take(temp).ToArray();
                 var checksum = message[3];
                 newChecksum = CalCheckSum(bytes, bytes.Length);
@@ -131,20 +131,17 @@ namespace Protocol
         /// <returns></returns>
         public static byte[] IntToHighLow(int input)
         {
-            int max = 500;
-            if (input <= 255)
-            {
-                return new byte[] { 0x0, (byte)input };
-            }
-            if (input >= 500)
-            {
-                return new byte[] { 0xff, 0xff };
-            }
-            else
-            {
-                int temp = input-255;
-                return new byte[] { (byte)temp, (byte)(input - temp) };
-            }
+            int test = input;
+            byte low = (byte)(test & 0xff);
+            byte high = (byte)((test >> 8) & 0xff);
+           // int res = low | (high << 8);
+            return new byte[] { high, low };
+        }
+
+        public static int HighLowToInt(byte high, byte low)
+        {
+            int res = low | (high << 8);
+            return res;
         }
     }
 
