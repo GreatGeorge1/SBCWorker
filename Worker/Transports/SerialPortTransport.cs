@@ -129,7 +129,7 @@ namespace Worker.Host.Transports
             sw.Reset();
             do
             {
-                if (sw.ElapsedMilliseconds >= 2000)
+                if (sw.ElapsedMilliseconds >= 1000)
                 {
                     Logger.LogWarning("ReadTimeout");
                     ok = false;
@@ -160,7 +160,7 @@ namespace Worker.Host.Transports
             list = new List<byte>();
             do
             {
-                if (sw.ElapsedMilliseconds >= 2000)
+                if (sw.ElapsedMilliseconds >= 1000)
                 {
                     Logger.LogWarning("ReadTimeout");
                     ok = false;
@@ -257,8 +257,9 @@ namespace Worker.Host.Transports
                     stream.Write(message, 0, message.Length);
                     if (port.IsRS485)
                     {
-                        stream.RtsEnable = true;
                         await Task.Delay(TimeSpan.FromMilliseconds(50));
+                        stream.RtsEnable = true;
+                        //await Task.Delay(TimeSpan.FromMilliseconds(50));
                     }
                     var bytes = stream.BytesToWrite;
                     var size = stream.WriteBufferSize;
@@ -268,21 +269,22 @@ namespace Worker.Host.Transports
                 {
                     Logger.LogWarning($"ex {port.PortName}");
                     Logger.LogWarning(ex.ToString());
-                    if (port.IsRS485)
+                    if (port.IsRS485 && stream.RtsEnable != true)
                     {
-                        stream.RtsEnable = true;
                         await Task.Delay(TimeSpan.FromMilliseconds(50));
+                        stream.RtsEnable = true;
+                        //await Task.Delay(TimeSpan.FromMilliseconds(50));
                     }
                     //throw new Exception(ex.Message);
                     return false;
                 }
                 finally
                 {
-                    if (port.IsRS485)
+                    if (port.IsRS485 && stream.RtsEnable != true)
                     {
-                        if(stream.RtsEnable != true)
-                            stream.RtsEnable = true;
                         await Task.Delay(TimeSpan.FromMilliseconds(50));
+                        stream.RtsEnable = true;
+                        //await Task.Delay(TimeSpan.FromMilliseconds(50));
                     }
                 }
                 semaphore.Release();

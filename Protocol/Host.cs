@@ -85,8 +85,8 @@ namespace Protocol
             {
                 executedMethod = new ExecutedMethod { MethodInfo = methodInfo, IsCompleted = false, IsFired = false };
                 executedMethod.PropertyChanged += OnExecuteMethodChange;
-                executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
-                executedMethod.RepeatLimit = 3;
+               // executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
+                executedMethod.RepeatLimit = 1;
             }
             Console.WriteLine($"ExecuteMethod hit:{command.GetDisplayName()}");
         }
@@ -122,8 +122,8 @@ namespace Protocol
                 return;
             }
             executedMethod.PropertyChanged += OnExecuteMethodChange;
-            executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
-            executedMethod.RepeatLimit = 3;
+            //executedMethod.RepeatCountReachedLimit += OnExecuteMethodRepeatReachedLimit;
+            executedMethod.RepeatLimit = 1;
             semaphore.Release();
             // logger.LogWarning($"Executed method: {executedMethod.MethodInfo.CommandHeader.GetDisplayName()}");
             Console.WriteLine($"ExecuteMethod hit:{method.MethodInfo.CommandHeader.GetDisplayName()}");
@@ -184,6 +184,17 @@ namespace Protocol
             return bytes.ToArray();
         }
 
+        private bool IsRepeatMethod(CommandHeader header)
+        {
+            if( executedMethod.IsCompleted == false && 
+                executedMethod.MethodInfo.CommandHeader == header && 
+                executedMethod.RepeatCount < executedMethod.RepeatLimit)
+            {
+                return true;
+            }
+            return false;
+        }
+
         private async Task<bool> ProcessControllerMethodAsync()
         {
             List<byte> list = new List<byte>();
@@ -191,7 +202,7 @@ namespace Protocol
             switch (executedMethod.MethodInfo.CommandHeader)
             {
                 case CommandHeader.FingerTimeoutCurrent:
-                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerTimeoutCurrent)
+                    while (IsRepeatMethod(CommandHeader.FingerTimeoutCurrent))
                     {
                         Console.WriteLine("FingerTimeoutCurrent switch case");
                         await transport.WriteMessageAsync(
@@ -207,7 +218,7 @@ namespace Protocol
 
                 case CommandHeader.FingerWriteInBase:
                     var msg = PrepareMessage(MessageType.REQ, CommandHeader.FingerWriteInBase, ExecutedMethod.CommandValue);
-                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerWriteInBase)
+                    while (IsRepeatMethod(CommandHeader.FingerWriteInBase))
                     {
                         Console.WriteLine("FingerWriteInBase switch case");
                         Console.WriteLine(BitConverter.ToString(msg));
@@ -221,7 +232,7 @@ namespace Protocol
                 case CommandHeader.TerminalConf:
                     list.AddRange(ExecutedMethod.CommandValue);
                     var msg1 = PrepareMessage(MessageType.REQ, CommandHeader.TerminalConf, ExecutedMethod.CommandValue);
-                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalConf)
+                    while (IsRepeatMethod(CommandHeader.TerminalConf))
                     {
                         Console.WriteLine("TerminalConf switch case");
                         Console.WriteLine(BitConverter.ToString(msg1));
@@ -234,7 +245,7 @@ namespace Protocol
 
                 case CommandHeader.TerminalSysInfo:
                     var msg111 = PrepareMessage(MessageType.REQ, CommandHeader.TerminalSysInfo, ExecutedMethod.CommandValue);
-                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.TerminalSysInfo)
+                    while (IsRepeatMethod(CommandHeader.TerminalSysInfo))
                     {
                         Console.WriteLine("TerminalConf switch case");
                         Console.WriteLine(BitConverter.ToString(msg111));
@@ -247,7 +258,7 @@ namespace Protocol
 
                 case CommandHeader.FingerDeleteId:
                     var msg2 = PrepareMessage(MessageType.REQ, CommandHeader.FingerDeleteId, ExecutedMethod.CommandValue);
-                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerDeleteId)
+                    while (IsRepeatMethod(CommandHeader.FingerDeleteId))
                     {
                         Console.WriteLine("FingerDeleteId  loop");
                         Console.WriteLine(BitConverter.ToString(msg2));
@@ -260,7 +271,7 @@ namespace Protocol
 
                 case CommandHeader.FingerDeleteAll:
                     var msg3 = PrepareMessage(MessageType.REQ, CommandHeader.FingerDeleteAll, ExecutedMethod.CommandValue);
-                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerDeleteAll)
+                    while (IsRepeatMethod(CommandHeader.FingerDeleteAll))
                     {
                         Console.WriteLine("FingerDeleteAll  loop");
                         Console.WriteLine(BitConverter.ToString(msg3));
@@ -273,7 +284,7 @@ namespace Protocol
 
                 case CommandHeader.FingerSetTimeout:
                     var msg4 = PrepareMessage(MessageType.REQ, CommandHeader.FingerSetTimeout, ExecutedMethod.CommandValue);
-                    while (executedMethod.IsCompleted == false && executedMethod.MethodInfo.CommandHeader == CommandHeader.FingerSetTimeout)
+                    while (IsRepeatMethod(CommandHeader.FingerSetTimeout))
                     {
                         Console.WriteLine("FingerSetTimeout  loop");
                         Console.WriteLine(BitConverter.ToString(msg4));
