@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Protocol
 {
-    public enum Error
+    public enum TerminalError
     {
         [Display(Name = "0x01")]
         Uart = 0x01,

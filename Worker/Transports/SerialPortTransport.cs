@@ -8,6 +8,7 @@ using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Worker.Host.Transports
@@ -16,6 +17,7 @@ namespace Worker.Host.Transports
     {
         private readonly SerialConfig port;
         private SerialPort stream;
+        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(1);
 
         private ILogger Logger { get; set; }
         private readonly object _lock = new object();
@@ -65,6 +67,7 @@ namespace Worker.Host.Transports
             {
                 stream.Handshake = Handshake.None;
                 stream.RtsEnable = true;
+                stream.DtrEnable = true;
                 Logger.LogInformation($"Port {port.PortName} in RS485 mode");
             }
 
@@ -94,10 +97,10 @@ namespace Worker.Host.Transports
             return true;
         }
 
-        private void EnqueueOutputMessageAction(object sender, MessageQueueEnqueueEventArgs<byte[]> args)
+        private async void EnqueueOutputMessageAction(object sender, MessageQueueEnqueueEventArgs<byte[]> args)
         {
             OutputQueue.TryDequeue(out byte[] msg);
-            WriteMessage(msg);
+            await WriteMessageAsync(msg);
         }
 
         private void PinChangedAction(object sender, SerialPinChangedEventArgs e)
@@ -110,10 +113,10 @@ namespace Worker.Host.Transports
             Logger.LogInformation($"Port {port.PortName} erorr: {e.ToString()}");
         }
 
-        private void DataReceivedAction(object sender, SerialDataReceivedEventArgs e)
+        private async void DataReceivedAction(object sender, SerialDataReceivedEventArgs e)
         {
             Logger.LogInformation("DataReceived Action raised");
-            ReadMessage();
+            await ReadMessageAsync();
         }
 
         private bool ReadBody(Stopwatch sw, int length, out ICollection<byte> list)
@@ -185,101 +188,104 @@ namespace Worker.Host.Transports
         /// Читает сообщение и добавляет построчно в InputQueue
         /// </summary>
         /// <returns></returns>
-        public void ReadMessage()
+        public async Task ReadMessageAsync()
         {
             bool ok = true;
             Stopwatch sw = new Stopwatch();
-            lock (_lock)
+            await semaphore.WaitAsync();
+            try
             {
-                try
+                if (port.IsRS485 && stream.RtsEnable != true)
                 {
-                    sw.Start();
-                    var bytes = new List<byte>();
-                    ok = ReadHeader(sw, out ICollection<byte> list);
+                    stream.RtsEnable = true;
+                    await Task.Delay(TimeSpan.FromMilliseconds(50));
+                }
+                sw.Start();
+                var bytes = new List<byte>();
+                ok = ReadHeader(sw, out ICollection<byte> list);
+                if (ok)
+                {
+                    bytes.AddRange(list);
+                    ok = ReadBody(sw, RequestMiddleware.HighLowToInt(
+                        list.ElementAt(4),
+                        list.ElementAt(5)
+                        ), out ICollection<byte> body);
                     if (ok)
                     {
-                        bytes.AddRange(list);
-                        ok = ReadBody(sw, RequestMiddleware.HighLowToInt(
-                            list.ElementAt(4),
-                            list.ElementAt(5)
-                            ), out ICollection<byte> body);
-                        if (ok)
-                        {
-                            bytes.AddRange(body);
-                        }
-                    }
-                    if (ok)
-                    {
-                        var res = bytes.ToArray();
-                        string str = BitConverter.ToString(res);
-                        Console.WriteLine(str);
-                        InputQueue.Enqueue(res);
-                    }
-                    else
-                    {
-                        Logger.LogWarning($"r:error, bytes:'{BitConverter.ToString(bytes.ToArray())}'");
+                        bytes.AddRange(body);
                     }
                 }
-                catch (IOException ex)
+                if (ok)
                 {
-                    Logger.LogWarning(ex.ToString());
+                    var res = bytes.ToArray();
+                    string str = BitConverter.ToString(res);
+                    Console.WriteLine(str);
+                    InputQueue.Enqueue(res);
                 }
-                catch (System.TimeoutException ex)
+                else
                 {
-                    Logger.LogWarning("r:timeout");
-                }
-                catch (InvalidOperationException ex)
-                {
-                    Logger.LogWarning(ex.ToString());
+                    Logger.LogWarning($"r:error, bytes:'{BitConverter.ToString(bytes.ToArray())}'");
                 }
             }
-            return;
+            catch (IOException ex)
+            {
+                Logger.LogWarning(ex.ToString());
+            }
+            catch (System.TimeoutException ex)
+            {
+                Logger.LogWarning("r:timeout");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogWarning(ex.ToString());
+            }
+            semaphore.Release();
         }
 
-        public bool WriteMessage(byte[] message)
+        public async Task<bool> WriteMessageAsync(byte[] message)
         {
             if (stream.IsOpen)
             {
-                lock (_lock)
+                await semaphore.WaitAsync();
+                try
                 {
-                    try
+                    if (port.IsRS485)
                     {
-                        if (port.IsRS485)
-                        {
-                            stream.RtsEnable = false;
-                            Task.Delay(TimeSpan.FromMilliseconds(50)).Wait();
-                        }
-                        stream.Write(message, 0, message.Length);
-                        if (port.IsRS485)
-                        {
-                            stream.RtsEnable = true;
-                            Task.Delay(TimeSpan.FromMilliseconds(50)).Wait();
-                        }
-                        var bytes = stream.BytesToWrite;
-                        var size = stream.WriteBufferSize;
-                        Logger.LogInformation($"wrote to port {port.PortName}: {message}, bytes {bytes}, buff_size {size}");
+                        stream.RtsEnable = false;
+                        await Task.Delay(TimeSpan.FromMilliseconds(50));
                     }
-                    catch (Exception ex)
+                    stream.Write(message, 0, message.Length);
+                    if (port.IsRS485)
                     {
-                        Logger.LogWarning($"ex {port.PortName}");
-                        Logger.LogWarning(ex.ToString());
-                        if (port.IsRS485)
-                        {
-                            stream.RtsEnable = true;
-                            Task.Delay(TimeSpan.FromMilliseconds(50)).Wait();
-                        }
-                        //throw new Exception(ex.Message);
-                        return false;
+                        stream.RtsEnable = true;
+                        await Task.Delay(TimeSpan.FromMilliseconds(50));
                     }
-                    finally
+                    var bytes = stream.BytesToWrite;
+                    var size = stream.WriteBufferSize;
+                    Logger.LogInformation($"wrote to port {port.PortName}: {message}, bytes {bytes}, buff_size {size}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"ex {port.PortName}");
+                    Logger.LogWarning(ex.ToString());
+                    if (port.IsRS485)
                     {
-                        if (port.IsRS485)
-                        {
-                            if(stream.RtsEnable != true)
-                                stream.RtsEnable = true;
-                        }
+                        stream.RtsEnable = true;
+                        await Task.Delay(TimeSpan.FromMilliseconds(50));
+                    }
+                    //throw new Exception(ex.Message);
+                    return false;
+                }
+                finally
+                {
+                    if (port.IsRS485)
+                    {
+                        if(stream.RtsEnable != true)
+                            stream.RtsEnable = true;
+                        await Task.Delay(TimeSpan.FromMilliseconds(50));
                     }
                 }
+                semaphore.Release();
             }
             else
             {

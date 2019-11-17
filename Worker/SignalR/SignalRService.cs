@@ -190,7 +190,7 @@ namespace Worker.Host.SignalR
             _= queue.TryDequeue(out SignalRresponse t);//govno
             if (flag == true && !(queue is null))
             {
-                switch ((SignalRMethod)item.Method)
+                switch (item.Method)
                 {
                     case SignalRMethod.GetConfig:
                         Console.WriteLine("OnSignalRresponse GetConfig");
@@ -217,7 +217,7 @@ namespace Worker.Host.SignalR
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.GetConfig, Address = req.Address });
+                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.GetConfig, Address = req.Address });
                 }
             }));
 
@@ -235,7 +235,7 @@ namespace Worker.Host.SignalR
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.GetFingerTimeoutCurrent });
+                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.GetFingerTimeoutCurrent });
                 }
 
             }));
@@ -266,7 +266,7 @@ namespace Worker.Host.SignalR
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.AddFinger, Uid = req.Uid, Privilage = req.Privilage });
+                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.AddFinger, Uid = req.Uid, Privilage = req.Privilage });
                 }
 
             }));
@@ -290,7 +290,7 @@ namespace Worker.Host.SignalR
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue((SignalRMessage)new SignalRMessage { Port = req.Port, Method = SignalRMethod.SendConfig, JsonString = req.JsonString });
+                    queue.Enqueue(new SignalRMessage { Port = req.Port, Method = SignalRMethod.SendConfig, JsonString = req.JsonString });
                 }
 
             }));
@@ -351,7 +351,7 @@ namespace Worker.Host.SignalR
 
                 if (flag == true && !(queue is null))
                 {
-                    queue.Enqueue((SignalRMessage)new SignalRMessage
+                    queue.Enqueue(new SignalRMessage
                     {
                         Port = req.Port,
                         Method = SignalRMethod.AddFingerByBle,
@@ -382,7 +382,7 @@ namespace Worker.Host.SignalR
 
                 if (!(queue is null))
                 {
-                    queue.Enqueue((SignalRMessage)new SignalRMessage
+                    queue.Enqueue(new SignalRMessage
                     {
                         Method = SignalRMethod.SetFingerTimeout,
                         Port = req.Port,
@@ -404,7 +404,7 @@ namespace Worker.Host.SignalR
 
                 if (!(queue is null))
                 {
-                    queue.Enqueue((SignalRMessage)new SignalRMessage
+                    queue.Enqueue(new SignalRMessage
                     {
                         Method = SignalRMethod.DeleteAllFingerprints,
                         Port = req.Port

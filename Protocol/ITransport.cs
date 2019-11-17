@@ -13,11 +13,11 @@ namespace Protocol
 
     public interface ITransport<TType>
     {
-        bool WriteMessage(TType input);
+        Task<bool> WriteMessageAsync(TType input);
         /// <summary>
         /// Читает сообщение и добавляет построчно в InputQueue
         /// </summary>
-        void ReadMessage();
+        Task ReadMessageAsync();
         bool Init();
         ConcurrentMessageBag<TType> InputQueue { get; }
         ConcurrentMessageBag<TType> OutputQueue { get; }
