@@ -124,7 +124,6 @@ namespace Protocol
             return _CheckSumByte;
         }
         /// <summary>
-        /// max input 500
         /// byte[] length 2
         /// </summary>
         /// <param name="input"></param>
